@@ -1,0 +1,20 @@
+{
+  "filter_paths": "lib/",
+  "exclude_informational": false,
+  "exclude_low": false,
+  "exclude_medium": false,
+  "exclude_high": false,
+  "solc_remaps": [
+    "forge-std/=lib/forge-std/src/",
+    "@uniswap/v4-core/=lib/uniswap-hooks/lib/v4-core/",
+    "@uniswap/v4-periphery/=lib/uniswap-hooks/lib/v4-periphery/",
+    "v4-core/=lib/uniswap-hooks/lib/v4-core/src/",
+    "v4-periphery/=lib/uniswap-hooks/lib/v4-periphery/",
+    "@openzeppelin/uniswap-hooks/=lib/uniswap-hooks/",
+    "@openzeppelin/contracts/=lib/uniswap-hooks/lib/v4-core/lib/openzeppelin-contracts/contracts/",
+    "hookmate/=lib/hookmate/src/",
+    "solmate/=lib/uniswap-hooks/lib/v4-core/lib/solmate/",
+    "permit2/=lib/uniswap-hooks/lib/v4-periphery/lib/permit2/"
+  ],
+  "detectors_to_exclude": "naming-convention"
+}

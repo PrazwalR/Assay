@@ -1,0 +1,51 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+
+solc_version = "0.8.26"
+evm_version = "cancun"
+bytecode_hash = "none"
+cbor_metadata = false
+
+# v4 hooks are deployed to a mined CREATE2 address, so the deployed bytecode must be
+# reproducible byte-for-byte from a checkout. bytecode_hash/cbor_metadata are disabled
+# above for the same reason: metadata varies with absolute paths and would move the address.
+optimizer = true
+optimizer_runs = 800
+
+# beforeSwap runs on every swap while the hook is deployed exactly once, so runtime cost
+# dominates deploy cost. 800 favours runtime without pushing the hook past the 24kB limit;
+# revisit only with a measured gas delta from test/gas.
+ffi = false
+fs_permissions = [{ access = "read", path = "./out" }]
+
+gas_reports = ["AssayHook"]
+
+[profile.ci]
+verbosity = 3
+fuzz = { runs = 10_000 }
+invariant = { runs = 512, depth = 128 }
+
+[profile.default.fuzz]
+runs = 1_000
+seed = "0x4153534159"
+
+[profile.default.invariant]
+runs = 128
+depth = 64
+fail_on_revert = true
+
+[fmt]
+line_length = 110
+tab_width = 4
+bracket_spacing = false
+int_types = "long"
+quote_style = "double"
+number_underscore = "thousands"
+multiline_func_header = "attributes_first"
+
+[lint]
+lint_on_build = true
