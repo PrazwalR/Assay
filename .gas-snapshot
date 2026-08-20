@@ -1,4 +1,3 @@
-AssayConfigTest:testFuzz_Validate_AcceptsExactlyTheOrderedDomain(uint24,uint24,uint24) (runs: 1000, μ: 4983, ~: 5199)
 AssayConfigTest:test_RevertWhen_BaseFeeExceedsMaxFee() (gas: 5054)
 AssayConfigTest:test_RevertWhen_BaseFeeIsZero() (gas: 4455)
 AssayConfigTest:test_RevertWhen_MaxFeeExceedsProtocolLimit() (gas: 5111)
@@ -19,7 +18,6 @@ DeployScriptTest:test_Deploy_ProducesCompliantAddressOnBaseSepolia() (gas: 10912
 DeployScriptTest:test_Deploy_ProducesCompliantAddressOnUnichainSepolia() (gas: 26252081)
 DeployScriptTest:test_RevertWhen_ChainHasNoKnownPoolManager() (gas: 4586)
 HookOverheadTest:test_Gas_HookOverheadWithinBudget() (gas: 375587)
-PoolSwapTest_Integration:testFuzz_Swap_AlwaysChargesBaseFee(bool,uint128) (runs: 1000, μ: 154294, ~: 156376)
 PoolSwapTest_Integration:test_AfterInitialize_SeedsStoredLpFee() (gas: 17812)
 PoolSwapTest_Integration:test_LiquidityProvider_CanAlwaysWithdraw() (gas: 133512)
 PoolSwapTest_Integration:test_Swap_ChargesBaseFeeForEverySwapInABlock() (gas: 321971)

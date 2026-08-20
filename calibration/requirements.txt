@@ -4,3 +4,4 @@ pyarrow
 scikit-learn
 statsmodels
 requests
+pytest

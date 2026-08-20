@@ -32,8 +32,14 @@ jobs:
       - name: Coverage
         run: forge coverage --report summary --no-match-coverage "(script|test)"
 
+      # Fuzz and invariant gas is a function of run count and seed, and the ci profile runs
+      # more fuzz iterations than the default one. Snapshotting them can never be stable, so
+      # the snapshot covers deterministic tests only. Keep this filter identical to the one
+      # used locally or the check will drift again.
       - name: Gas snapshot
-        run: forge snapshot --check || (echo "gas changed; commit the new snapshot" && exit 1)
+        run: |
+          forge snapshot --check --no-match-test "testFuzz|invariant" \
+            || (echo "gas changed; regenerate with: forge snapshot --no-match-test \"testFuzz|invariant\"" && exit 1)
 
   analysis:
     runs-on: ubuntu-latest
