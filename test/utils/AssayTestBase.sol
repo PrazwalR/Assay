@@ -33,6 +33,13 @@ abstract contract AssayTestBase is Test {
 
     int24 internal constant TICK_SPACING = 60;
 
+    // Test fixtures, not calibrated values. lambda = 0.94 gives a ~17 block lookback for
+    // variance; the order-flow decay is a 50-swap half-life, matching the Python pipeline's
+    // default. Real deployments must supply values produced by the calibration milestone.
+    uint64 internal constant VARIANCE_LAMBDA_X32 = 4_037_269_258;
+    uint64 internal constant OFI_LAMBDA_X32 = 4_235_837_212;
+    int24 internal constant MAX_TICK_DELTA = 1000;
+
     PoolManager internal manager;
     AssayHook internal hook;
     PoolSwapTest internal swapRouter;
@@ -54,7 +61,14 @@ abstract contract AssayTestBase is Test {
     }
 
     function _defaultConfig() internal pure returns (AssayConfig memory) {
-        return AssayConfig({baseFeePips: BASE_FEE_PIPS, minFeePips: MIN_FEE_PIPS, maxFeePips: MAX_FEE_PIPS});
+        return AssayConfig({
+            baseFeePips: BASE_FEE_PIPS,
+            minFeePips: MIN_FEE_PIPS,
+            maxFeePips: MAX_FEE_PIPS,
+            varianceLambdaX32: VARIANCE_LAMBDA_X32,
+            ofiLambdaX32: OFI_LAMBDA_X32,
+            maxTickDeltaPerBlock: MAX_TICK_DELTA
+        });
     }
 
     /// @dev Mines a salt so the deployed address carries exactly `EXPECTED_FLAGS`. Deploying

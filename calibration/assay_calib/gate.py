@@ -27,6 +27,71 @@ EXPECTED_SIGNS: dict[str, int] = {
 
 
 @dataclass(frozen=True)
+class GateVerdict:
+    """
+    The conjunction that decides P0, evaluated on one pre-declared label.
+
+    Each criterion answers a distinct way the headline number could be spurious: the AUC
+    bar that the signal is strong enough to matter, the permutation margin that it is not
+    an artefact of fitting, the fold floor that it is not a single regime, the positive
+    count that it is not a handful of rows, and the sign check that it agrees with the
+    microstructure theory that motivated the features.
+    """
+
+    label: str
+    checks: dict[str, bool]
+    detail: dict[str, float]
+
+    @property
+    def passed(self) -> bool:
+        return all(self.checks.values())
+
+    @property
+    def failures(self) -> list[str]:
+        return [name for name, ok in self.checks.items() if not ok]
+
+
+def evaluate_verdict(
+    result: GateResult,
+    folds: list[float],
+    shuffled_auc: float,
+    univariate: dict[str, float],
+    cfg: CalibrationConfig,
+) -> GateVerdict:
+    """Applies every gate criterion to a single result, returning each outcome separately."""
+    weakest_fold = min(folds) if folds else float("nan")
+    checks = {
+        "auc_above_gate": result.auc_test >= cfg.gate.min_auc,
+        "beats_shuffled_control": (result.auc_test - shuffled_auc) >= cfg.gate.min_permutation_margin,
+        "every_fold_holds": bool(folds) and weakest_fold >= cfg.gate.min_fold_auc,
+        "enough_test_positives": result.test_positives() >= cfg.gate.min_test_positives,
+    }
+    if cfg.gate.require_theory_signs:
+        # Univariate direction, not the multivariate coefficient sign. The features are
+        # correlated by construction -- order-flow imbalance and direction-versus-drift both
+        # encode directional persistence -- so a coefficient can legitimately flip sign once
+        # a collinear partner enters the fit. What theory actually predicts is that each
+        # feature is individually informative in the stated direction, which is what an AUC
+        # above 0.5 measures and what a labelling or alignment bug would break.
+        checks["each_feature_points_as_theory_predicts"] = bool(univariate) and all(
+            score >= 0.5 for score in univariate.values()
+        )
+
+    return GateVerdict(
+        label=result.label_column,
+        checks=checks,
+        detail={
+            "auc_test": result.auc_test,
+            "auc_shuffled": shuffled_auc,
+            "permutation_margin": result.auc_test - shuffled_auc,
+            "weakest_fold": weakest_fold,
+            "test_positives": float(result.test_positives()),
+            "weakest_univariate_auc": min(univariate.values()) if univariate else float("nan"),
+        },
+    )
+
+
+@dataclass(frozen=True)
 class GateResult:
     label_column: str
     n_train: int
@@ -47,13 +112,18 @@ class GateResult:
             if name in EXPECTED_SIGNS
         }
 
-    def passed(self, cfg: CalibrationConfig) -> bool:
+    def test_positives(self) -> int:
+        c = self.confusion
+        return c["tp"] + c["fn"]
+
+    def clears_auc(self, cfg: CalibrationConfig) -> bool:
+        """Whether this variant clears the headline AUC bar. Not the verdict on its own."""
         return self.auc_test >= cfg.gate.min_auc
 
 
-def _winsorize(frame: pd.DataFrame, lower: float = 0.005, upper: float = 0.995) -> pd.DataFrame:
+def _winsorize(frame: pd.DataFrame, cfg: CalibrationConfig) -> pd.DataFrame:
     """Clip extreme feature values so a handful of outliers cannot dominate the fit."""
-    bounds = frame.quantile([lower, upper])
+    bounds = frame.quantile([cfg.gate.winsorize_lower, cfg.gate.winsorize_upper])
     return frame.clip(bounds.iloc[0], bounds.iloc[1], axis=1)
 
 
@@ -74,7 +144,7 @@ def run_gate(
     split_at = int(len(df) * (1.0 - cfg.gate.test_fraction))
     train, test = df.iloc[:split_at], df.iloc[split_at:]
 
-    x_train = _winsorize(train[list(FEATURE_COLUMNS)].astype("float64"))
+    x_train = _winsorize(train[list(FEATURE_COLUMNS)].astype("float64"), cfg)
     x_test = test[list(FEATURE_COLUMNS)].astype("float64").clip(
         x_train.min(), x_train.max(), axis=1
     )
@@ -87,14 +157,17 @@ def run_gate(
     scaler = StandardScaler().fit(x_train)
     model = LogisticRegression(
         class_weight="balanced",
-        max_iter=2000,
+        max_iter=cfg.gate.max_iter,
         random_state=cfg.gate.random_seed,
     ).fit(scaler.transform(x_train), y_train)
 
     p_train = model.predict_proba(scaler.transform(x_train))[:, 1]
     p_test = model.predict_proba(scaler.transform(x_test))[:, 1]
 
-    threshold = float(np.quantile(p_test, 1.0 - y_test.mean()))
+    # Quantile taken from the training base rate. Reading it off y_test would choose the
+    # operating point using the very labels it is then scored against, biasing the reported
+    # precision and recall upward.
+    threshold = float(np.quantile(p_test, 1.0 - y_train.mean()))
     tn, fp, fn, tp = confusion_matrix(y_test, (p_test >= threshold).astype(int)).ravel()
 
     # Threshold-free check: g(pi) needs the score to *rank* flow by how costly it is, so
@@ -145,9 +218,7 @@ def univariate_auc(df: pd.DataFrame, cfg: CalibrationConfig, label_column: str) 
     return scores
 
 
-def walk_forward_auc(
-    df: pd.DataFrame, cfg: CalibrationConfig, label_column: str, folds: int = 5
-) -> list[float]:
+def walk_forward_auc(df: pd.DataFrame, cfg: CalibrationConfig, label_column: str) -> list[float]:
     """
     AUC across consecutive time folds, each trained only on data preceding it.
 
@@ -157,25 +228,30 @@ def walk_forward_auc(
     signal from regime fitting far more reliably than a single split.
     """
     df = df.sort_values(["block", "log_index"]).reset_index(drop=True)
+    folds = cfg.gate.walk_forward_folds
     scores: list[float] = []
     edges = np.linspace(0, len(df), folds + 2, dtype=int)
 
     for i in range(1, folds + 1):
         train = df.iloc[: edges[i]]
         test = df.iloc[edges[i] : edges[i + 1]]
-        if len(test) < 50 or len(train) < 100:
+        if len(test) < cfg.gate.min_fold_test_rows or len(train) < cfg.gate.min_fold_train_rows:
+            log.warning(
+                "walk-forward fold %d skipped: %d train / %d test rows below minimum",
+                i, len(train), len(test),
+            )
             continue
         y_train, y_test = train[label_column].to_numpy(), test[label_column].to_numpy()
         if len(np.unique(y_train)) < 2 or len(np.unique(y_test)) < 2:
             continue
 
-        x_train = _winsorize(train[list(FEATURE_COLUMNS)].astype("float64"))
+        x_train = _winsorize(train[list(FEATURE_COLUMNS)].astype("float64"), cfg)
         x_test = test[list(FEATURE_COLUMNS)].astype("float64").clip(
             x_train.min(), x_train.max(), axis=1
         )
         scaler = StandardScaler().fit(x_train)
         model = LogisticRegression(
-            class_weight="balanced", max_iter=2000, random_state=cfg.gate.random_seed
+            class_weight="balanced", max_iter=cfg.gate.max_iter, random_state=cfg.gate.random_seed
         ).fit(scaler.transform(x_train), y_train)
         scores.append(
             float(roc_auc_score(y_test, model.predict_proba(scaler.transform(x_test))[:, 1]))

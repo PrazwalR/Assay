@@ -68,6 +68,7 @@ class LabelSpec:
 
     horizons_seconds: tuple[int, ...]
     primary_horizon_seconds: int
+    primary_threshold_multiple: int
     threshold_multiples: tuple[int, ...]
 
     def __post_init__(self) -> None:
@@ -78,6 +79,11 @@ class LabelSpec:
         if self.primary_horizon_seconds not in self.horizons_seconds:
             raise ConfigError(
                 f"primary horizon {self.primary_horizon_seconds} not in {self.horizons_seconds}"
+            )
+        if self.primary_threshold_multiple not in self.threshold_multiples:
+            raise ConfigError(
+                f"primary threshold {self.primary_threshold_multiple} not in "
+                f"{self.threshold_multiples}"
             )
         if not self.threshold_multiples or any(k < 1 for k in self.threshold_multiples):
             raise ConfigError(
@@ -104,17 +110,53 @@ class FeatureSpec:
 
 @dataclass(frozen=True)
 class GateSpec:
-    """The pass/fail criterion for P0."""
+    """
+    The pass/fail criterion for P0.
+
+    The verdict is a conjunction applied to one pre-declared label, not the best of a
+    sweep. Searching 18 label variants and reporting whichever scored highest would be
+    selection on the test set, and would make the reported AUC an upper order statistic
+    rather than an estimate. The sweep is still produced, but only as exploratory output.
+    """
 
     min_auc: float
     test_fraction: float
     random_seed: int
+    min_permutation_margin: float
+    min_fold_auc: float
+    min_test_positives: int
+    require_theory_signs: bool
+    winsorize_lower: float
+    winsorize_upper: float
+    max_iter: int
+    walk_forward_folds: int
+    min_fold_test_rows: int
+    min_fold_train_rows: int
 
     def __post_init__(self) -> None:
         if not 0.5 < self.min_auc < 1.0:
             raise ConfigError(f"min_auc must be in (0.5, 1.0): {self.min_auc}")
         if not 0.0 < self.test_fraction < 0.5:
             raise ConfigError(f"test_fraction must be in (0, 0.5): {self.test_fraction}")
+        if not 0.0 <= self.min_permutation_margin < 0.5:
+            raise ConfigError(
+                f"min_permutation_margin must be in [0, 0.5): {self.min_permutation_margin}"
+            )
+        if not 0.0 < self.min_fold_auc < 1.0:
+            raise ConfigError(f"min_fold_auc must be in (0, 1): {self.min_fold_auc}")
+        if self.min_test_positives < 1:
+            raise ConfigError(f"min_test_positives must be >= 1: {self.min_test_positives}")
+        if not 0.0 <= self.winsorize_lower < self.winsorize_upper <= 1.0:
+            raise ConfigError(
+                f"winsorize bounds must satisfy 0 <= lower < upper <= 1: "
+                f"{self.winsorize_lower}, {self.winsorize_upper}"
+            )
+        if self.max_iter < 1:
+            raise ConfigError(f"max_iter must be >= 1: {self.max_iter}")
+        if self.walk_forward_folds < 2:
+            raise ConfigError(f"walk_forward_folds must be >= 2: {self.walk_forward_folds}")
+        if self.min_fold_test_rows < 1 or self.min_fold_train_rows < 1:
+            raise ConfigError("fold row minimums must be >= 1")
 
 
 @dataclass(frozen=True)
@@ -205,7 +247,14 @@ def load_config() -> CalibrationConfig:
         ),
         labels=LabelSpec(
             horizons_seconds=(30, 300, 3_600),
+            # The primary label is declared here, before the data is read, and is the only
+            # one the verdict considers. Theory picks it: CEX-DEX arbitrage captures a stale
+            # price rather than forecasting, so the signal belongs at the shortest horizon,
+            # and the threshold must exceed the fee by enough that ordinary price noise does
+            # not clear it. A label chosen after inspecting the sweep would be selection on
+            # the test set.
             primary_horizon_seconds=_env_int("ASSAY_PRIMARY_HORIZON_SECONDS", 30),
+            primary_threshold_multiple=_env_int("ASSAY_PRIMARY_THRESHOLD_MULTIPLE", 5),
             threshold_multiples=(1, 2, 5),
         ),
         features=FeatureSpec(
@@ -217,6 +266,20 @@ def load_config() -> CalibrationConfig:
             min_auc=_env_float("ASSAY_GATE_MIN_AUC", 0.65),
             test_fraction=_env_float("ASSAY_GATE_TEST_FRACTION", 0.3),
             random_seed=_env_int("ASSAY_SEED", 20260819),
+            # The classifier must beat its own shuffled-label control by a real margin, or
+            # the score is an artefact of the fitting procedure rather than the data.
+            min_permutation_margin=_env_float("ASSAY_GATE_MIN_PERMUTATION_MARGIN", 0.05),
+            # Every walk-forward fold must clear this. A signal that holds in some periods
+            # and collapses in others is tracking the sample's price regime.
+            min_fold_auc=_env_float("ASSAY_GATE_MIN_FOLD_AUC", 0.60),
+            min_test_positives=_env_int("ASSAY_GATE_MIN_TEST_POSITIVES", 100),
+            require_theory_signs=_env_int("ASSAY_GATE_REQUIRE_SIGNS", 1) == 1,
+            winsorize_lower=_env_float("ASSAY_GATE_WINSORIZE_LOWER", 0.005),
+            winsorize_upper=_env_float("ASSAY_GATE_WINSORIZE_UPPER", 0.995),
+            max_iter=_env_int("ASSAY_GATE_MAX_ITER", 2_000),
+            walk_forward_folds=_env_int("ASSAY_GATE_WALK_FORWARD_FOLDS", 5),
+            min_fold_test_rows=_env_int("ASSAY_GATE_MIN_FOLD_TEST_ROWS", 50),
+            min_fold_train_rows=_env_int("ASSAY_GATE_MIN_FOLD_TRAIN_ROWS", 100),
         ),
         reference_symbol=os.environ.get("ASSAY_REFERENCE_SYMBOL", "ETHUSDT"),
         reference_venue=os.environ.get("ASSAY_REFERENCE_VENUE", "binance"),

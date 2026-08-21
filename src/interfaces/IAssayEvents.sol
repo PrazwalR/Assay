@@ -11,10 +11,25 @@ interface IAssayEvents {
     /// @param baseFeePips The fee seeded via `updateDynamicLPFee`, in hundredths of a bip.
     event PoolRegistered(PoolId indexed poolId, uint24 baseFeePips);
 
-    /// @notice Emitted for every scored swap, giving per-swap attribution of the quoted fee.
+    /// @notice Emitted for every scored swap, giving per-swap attribution of the quoted fee
+    ///         alongside the state it was derived from.
     /// @param poolId The pool the swap executed against.
     /// @param sender The address that called the PoolManager, which is the router and not
     ///        the trader. It must never be treated as an identity.
     /// @param feePips The fee quoted for this swap, in hundredths of a bip.
-    event SwapAssayed(PoolId indexed poolId, address indexed sender, uint24 feePips);
+    /// @param varEwmaX32 Realised variance after this swap, Q32.32, in squared ticks.
+    /// @param ofiEwmaX32 Order-flow imbalance after this swap, Q32.32, in [-1, 1].
+    event SwapAssayed(
+        PoolId indexed poolId, address indexed sender, uint24 feePips, uint64 varEwmaX32, int64 ofiEwmaX32
+    );
+
+    /// @notice Emitted when a block's tick move exceeded the configured clamp and was
+    ///         truncated before entering the variance estimate.
+    /// @dev Rare by construction. A burst of these is evidence of either genuine market
+    ///      dislocation or an attempt to inflate the variance estimate, and both are worth
+    ///      alerting on.
+    /// @param poolId The pool whose move was clamped.
+    /// @param observedDelta The tick delta actually observed across the block.
+    /// @param clampedTo The bound it was truncated to.
+    event TickDeltaClamped(PoolId indexed poolId, int256 observedDelta, int24 clampedTo);
 }

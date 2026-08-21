@@ -28,7 +28,14 @@ contract DeployScriptTest is Test {
     }
 
     function _config() internal pure returns (AssayConfig memory) {
-        return AssayConfig({baseFeePips: 500, minFeePips: 100, maxFeePips: 10_000});
+        return AssayConfig({
+            baseFeePips: 500,
+            minFeePips: 100,
+            maxFeePips: 10_000,
+            varianceLambdaX32: 4_037_269_258,
+            ofiLambdaX32: 4_235_837_212,
+            maxTickDeltaPerBlock: 1000
+        });
     }
 
     function test_Deploy_ProducesCompliantAddressOnBaseSepolia() public {

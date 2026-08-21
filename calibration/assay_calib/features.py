@@ -66,7 +66,14 @@ def build_frame(
     df["notional_usd"] = amount0.abs() / 10.0**dec0
     df["qty_eth_signed"] = -amount1 / 10.0**dec1
     df["direction"] = np.sign(df["qty_eth_signed"])
-    df["exec_price"] = (amount0.abs() * 10.0 ** (dec1 - dec0)) / amount1.abs()
+    # A swap with zero on either leg has no execution price. Producing inf here would
+    # propagate through every markout column; NaN is dropped cleanly by `clean` instead.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        df["exec_price"] = np.where(
+            (amount0 != 0) & (amount1 != 0),
+            (amount0.abs() * 10.0 ** (dec1 - dec0)) / amount1.abs().replace(0, np.nan),
+            np.nan,
+        )
 
     _attach_reference(df, reference)
 
@@ -159,7 +166,12 @@ def attach_markouts(
             df[f"markout_{variant}_{horizon}s"] = markout
             # Continuous target in basis points of notional: threshold-free, and the
             # quantity g(pi) actually needs to rank correctly.
-            df[f"markout_bps_{variant}_{horizon}s"] = markout / notional * 1e4
+            # Some swaps carry zero notional in the quote token; dividing would emit inf
+            # and silently poison every downstream statistic. They are dropped by `clean`
+            # via the min-notional filter, but the column must not contain infinities first.
+            with np.errstate(divide="ignore", invalid="ignore"):
+                bps = np.where(notional > 0, markout / np.where(notional > 0, notional, 1.0) * 1e4, np.nan)
+            df[f"markout_bps_{variant}_{horizon}s"] = bps
             for k in cfg.labels.threshold_multiples:
                 label = np.where(valid, (markout > k * fee_usd).astype("float64"), np.nan)
                 df[f"informed_{variant}_{horizon}s_k{k}"] = label

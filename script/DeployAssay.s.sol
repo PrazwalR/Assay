@@ -29,7 +29,10 @@ contract DeployAssay is Script {
         AssayConfig memory config = AssayConfig({
             baseFeePips: uint24(vm.envUint("ASSAY_BASE_FEE_PIPS")),
             minFeePips: uint24(vm.envUint("ASSAY_MIN_FEE_PIPS")),
-            maxFeePips: uint24(vm.envUint("ASSAY_MAX_FEE_PIPS"))
+            maxFeePips: uint24(vm.envUint("ASSAY_MAX_FEE_PIPS")),
+            varianceLambdaX32: uint64(vm.envUint("ASSAY_VARIANCE_LAMBDA_X32")),
+            ofiLambdaX32: uint64(vm.envUint("ASSAY_OFI_LAMBDA_X32")),
+            maxTickDeltaPerBlock: int24(vm.envInt("ASSAY_MAX_TICK_DELTA_PER_BLOCK"))
         });
         return deploy(IPoolManager(AddressConstants.getPoolManagerAddress(block.chainid)), config);
     }

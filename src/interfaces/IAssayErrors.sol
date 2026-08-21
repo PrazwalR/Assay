@@ -19,4 +19,15 @@ interface IAssayErrors {
 
     /// @notice A fee bound was configured as zero, which would quote a free swap.
     error AssayHook__FeeIsZero();
+
+    /// @notice An EWMA decay factor was outside the open interval (0, 1) in Q32.32, which
+    ///         would either freeze the estimator or discard all history.
+    error AssayHook__LambdaOutOfRange(uint64 lambdaX32);
+
+    /// @notice The per-block tick-delta clamp was zero or above the bound that keeps the
+    ///         variance EWMA provably free of overflow.
+    error AssayHook__TickDeltaClampOutOfRange(int24 maxTickDelta, int24 upperBound);
+
+    /// @notice A value could not be represented in Q32.32 without truncation.
+    error AssayHook__FixedPointOverflow(uint256 value);
 }

@@ -21,6 +21,8 @@ from assay_calib.fetch import decode_big_ints
 from assay_calib.gate import (
     EXPECTED_SIGNS,
     GateResult,
+    GateVerdict,
+    evaluate_verdict,
     permutation_auc,
     run_gate,
     univariate_auc,
@@ -73,7 +75,7 @@ def _print_matrix(rows: list[dict], cfg: CalibrationConfig) -> None:
             f"{r['spearman']:>10.4f}{r['n_test']:>9,}"
         )
     print("-" * 92)
-    print(f"gate threshold: AUC_test >= {cfg.gate.min_auc}")
+    print(f"exploratory only -- the verdict below uses one pre-declared label, not this sweep")
 
 
 def _print_coefficients(result: GateResult) -> None:
@@ -107,6 +109,50 @@ def _describe_labels(frame: pd.DataFrame, cfg: CalibrationConfig) -> None:
         )
     print(f"\nfee is {cfg.pool.fee_fraction * 1e4:.1f} bps -- a label only carries information")
     print("if realised markout is separable from noise at that scale")
+
+
+def _decide(frame: pd.DataFrame, cfg: CalibrationConfig) -> GateVerdict:
+    """
+    Evaluates the pre-declared primary label against every gate criterion.
+
+    The sweep printed above is exploratory. Taking its maximum as the result would be
+    selection on the test set: with 18 variants the largest score is an order statistic,
+    not an estimate, and it carries none of the guarantees a single pre-declared test does.
+    """
+    label = (
+        f"informed_std_{cfg.labels.primary_horizon_seconds}s"
+        f"_k{cfg.labels.primary_threshold_multiple}"
+    )
+    markout = f"markout_bps_std_{cfg.labels.primary_horizon_seconds}s"
+    scored = clean(frame, cfg, label)
+
+    result = run_gate(scored, cfg, label, markout)
+    folds = walk_forward_auc(scored, cfg, label)
+    shuffled = permutation_auc(scored, cfg, label)
+    univariate = univariate_auc(scored, cfg, label)
+    return evaluate_verdict(result, folds, shuffled, univariate, cfg)
+
+
+def _print_verdict(verdict: GateVerdict, cfg: CalibrationConfig) -> None:
+    print(f"\n{'=' * 92}")
+    print(f"P0 GATE -- pre-declared primary label: {verdict.label}")
+    print(f"{'=' * 92}")
+    labels = {
+        "auc_above_gate": f"out-of-sample AUC >= {cfg.gate.min_auc}",
+        "beats_shuffled_control": f"margin over shuffled control >= {cfg.gate.min_permutation_margin}",
+        "every_fold_holds": f"weakest walk-forward fold >= {cfg.gate.min_fold_auc}",
+        "enough_test_positives": f"test positives >= {cfg.gate.min_test_positives}",
+        "each_feature_points_as_theory_predicts": "every feature informative in the predicted direction",
+    }
+    for name, ok in verdict.checks.items():
+        print(f"  [{'PASS' if ok else 'FAIL'}]  {labels.get(name, name)}")
+    print()
+    for name, value in verdict.detail.items():
+        print(f"    {name:22} {value:.4f}")
+    print(f"\n  VERDICT: {'PASS' if verdict.passed else 'FAIL'}")
+    if not verdict.passed:
+        print(f"  failed criteria: {', '.join(verdict.failures)}")
+    print(f"{'=' * 92}")
 
 
 def main() -> int:
@@ -146,7 +192,7 @@ def main() -> int:
                         n_test=result.n_test,
                         coefficients=result.coefficients,
                         sign_agreement={k2: bool(v) for k2, v in result.sign_agreement.items()},
-                        passed=bool(result.passed(cfg)),
+                        clears_auc=bool(result.clears_auc(cfg)),
                     )
                     if best is None or result.auc_test > best[0]:
                         best = (result.auc_test, result)
@@ -175,33 +221,28 @@ def main() -> int:
             print("    not adverse selection")
         summary_folds[label] = folds
 
-    passed = [r for r in rows if r.get("passed")]
-    print(f"\n{'=' * 92}")
-    if best is None:
-        print("P0 GATE: INCONCLUSIVE -- no label variant could be fitted")
-    else:
-        print(f"P0 GATE: best out-of-sample AUC = {best[0]:.4f} on {best[1].label_column}")
-        print(f"         {len(passed)}/{len(rows)} label variants clear AUC >= {cfg.gate.min_auc}")
-        print(f"         VERDICT: {'PASS' if passed else 'FAIL'}")
-    print(f"{'=' * 92}")
+    verdict = _decide(frame, cfg)
+    _print_verdict(verdict, cfg)
 
-    primary = f"informed_std_{cfg.labels.primary_horizon_seconds}s_k1"
     summary = {
         "pool": cfg.pool.address,
         "tag": args.tag,
         "n_swaps_raw": int(len(swaps)),
-        "dataset_hash": _dataset_hash(clean(frame, cfg, primary)),
+        "dataset_hash": _dataset_hash(clean(frame, cfg, verdict.label)),
         "gate_min_auc": cfg.gate.min_auc,
-        "best_auc_test": best[0] if best else None,
-        "best_label": best[1].label_column if best else None,
-        "verdict": "PASS" if passed else "FAIL",
+        "primary_label": verdict.label,
+        "verdict": "PASS" if verdict.passed else "FAIL",
+        "verdict_checks": verdict.checks,
+        "verdict_detail": verdict.detail,
+        "exploratory_best_auc": best[0] if best else None,
+        "exploratory_best_label": best[1].label_column if best else None,
         "walk_forward": summary_folds,
         "matrix": rows,
     }
     out = cfg.data_dir / f"p0_gate_result_{args.tag}.json"
     out.write_text(json.dumps(summary, indent=2, default=float))
     print(f"wrote {out}")
-    return 0 if passed else 1
+    return 0 if verdict.passed else 1
 
 
 if __name__ == "__main__":
