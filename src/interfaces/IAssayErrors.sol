@@ -30,4 +30,17 @@ interface IAssayErrors {
 
     /// @notice A value could not be represented in Q32.32 without truncation.
     error AssayHook__FixedPointOverflow(uint256 value);
+
+    /// @notice The share of captured drift to charge was zero or above 100%.
+    error AssayHook__CaptureShareOutOfRange(uint24 captureShareBps, uint24 upperBound);
+
+    /// @notice The pool's currencies are not the pair the reference source prices, so the
+    ///         hook has no usable view of this pool's fair value.
+    error AssayHook__PoolDoesNotMatchReference(
+        address expectedCurrency0, address expectedCurrency1, address actualCurrency0, address actualCurrency1
+    );
+
+    /// @notice No reference price source was configured. The mispricing signal is the
+    ///         hook's primary input, so a deployment without one cannot price anything.
+    error AssayHook__ReferenceOracleIsZeroAddress();
 }

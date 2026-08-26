@@ -20,9 +20,12 @@ from assay_calib.features import (
 from assay_calib.fetch import decode_big_ints
 from assay_calib.gate import (
     EXPECTED_SIGNS,
+    FEATURE_SETS,
     GateResult,
     GateVerdict,
+    IncrementalValue,
     evaluate_verdict,
+    incremental_value,
     permutation_auc,
     run_gate,
     univariate_auc,
@@ -133,6 +136,21 @@ def _decide(frame: pd.DataFrame, cfg: CalibrationConfig) -> GateVerdict:
     return evaluate_verdict(result, folds, shuffled, univariate, cfg)
 
 
+def _print_incremental(value: IncrementalValue, label: str) -> None:
+    print(f"\n{'=' * 92}")
+    print(f"INCREMENTAL VALUE over an oracle-only hook -- {label}")
+    print(f"{'=' * 92}")
+    for name, features in FEATURE_SETS.items():
+        print(f"  {name:14} AUC {value.auc[name]:.4f}   ({len(features)} features)")
+    print()
+    print(f"  microstructure adds over reading an oracle : {value.gain_over_oracle:+.4f}")
+    print(f"  the oracle adds over on-chain signals only : {value.gain_over_onchain:+.4f}")
+    print()
+    print("  If the first number is near zero, this is an oracle-based dynamic fee with")
+    print("  extra gas. If the second is near zero, the hook needs no oracle at all.")
+    print(f"{'=' * 92}")
+
+
 def _print_verdict(verdict: GateVerdict, cfg: CalibrationConfig) -> None:
     print(f"\n{'=' * 92}")
     print(f"P0 GATE -- pre-declared primary label: {verdict.label}")
@@ -222,6 +240,8 @@ def main() -> int:
         summary_folds[label] = folds
 
     verdict = _decide(frame, cfg)
+    increment = incremental_value(clean(frame, cfg, verdict.label), cfg, verdict.label)
+    _print_incremental(increment, verdict.label)
     _print_verdict(verdict, cfg)
 
     summary = {
@@ -234,6 +254,11 @@ def main() -> int:
         "verdict": "PASS" if verdict.passed else "FAIL",
         "verdict_checks": verdict.checks,
         "verdict_detail": verdict.detail,
+        "incremental_value": {
+            "auc_by_feature_set": increment.auc,
+            "gain_over_oracle": increment.gain_over_oracle,
+            "gain_over_onchain": increment.gain_over_onchain,
+        },
         "exploratory_best_auc": best[0] if best else None,
         "exploratory_best_label": best[1].label_column if best else None,
         "walk_forward": summary_folds,

@@ -10,6 +10,10 @@ import {AddressConstants} from "hookmate/constants/AddressConstants.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 
 import {AssayHook} from "../../src/AssayHook.sol";
+import {Currency} from "v4-core/types/Currency.sol";
+
+import {ChainlinkReferenceAdapter, IAggregatorV3} from "../../src/oracle/ChainlinkReferenceAdapter.sol";
+import {MockAggregatorV3} from "../mocks/MockAggregatorV3.sol";
 import {AssayConfig} from "../../src/config/AssayConfig.sol";
 import {DeployAssay} from "../../script/DeployAssay.s.sol";
 
@@ -27,14 +31,23 @@ contract DeployScriptTest is Test {
         vm.etch(poolManager, address(new PoolManager(address(this))).code);
     }
 
-    function _config() internal pure returns (AssayConfig memory) {
+    function _config() internal returns (AssayConfig memory) {
+        address feed = address(new MockAggregatorV3(int256(1e8), block.timestamp));
+        // Any correctly-ordered pair; this test exercises mining and wiring, not pricing.
+        address oracle = address(
+            new ChainlinkReferenceAdapter(
+                IAggregatorV3(feed), 3600, 1e8, Currency.wrap(address(1)), Currency.wrap(address(2))
+            )
+        );
         return AssayConfig({
             baseFeePips: 500,
             minFeePips: 100,
             maxFeePips: 10_000,
             varianceLambdaX32: 4_037_269_258,
             ofiLambdaX32: 4_235_837_212,
-            maxTickDeltaPerBlock: 1000
+            maxTickDeltaPerBlock: 1000,
+            captureShareBps: 5000,
+            referenceOracle: oracle
         });
     }
 

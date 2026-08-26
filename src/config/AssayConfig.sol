@@ -19,6 +19,8 @@ struct AssayConfig {
     uint64 varianceLambdaX32;
     uint64 ofiLambdaX32;
     int24 maxTickDeltaPerBlock;
+    uint24 captureShareBps;
+    address referenceOracle;
 }
 
 /// @notice Validation for `AssayConfig`.
@@ -26,6 +28,11 @@ library AssayConfigLib {
     /// @dev Smallest permitted `ONE - lambda`. Corresponds to a half-life of roughly 2,839
     ///      samples, well beyond any lookback this project uses.
     uint64 internal constant MIN_DECAY_GAP = 1 << 20;
+
+    /// @dev A capture share above 100% would charge more than the drift being captured,
+    ///      which deters the arbitrage entirely and leaves the pool stale. Zero disables the
+    ///      response, which is a hook that does nothing.
+    uint24 internal constant MAX_CAPTURE_SHARE_BPS = 10_000;
 
     /// @notice Reverts unless the fee bounds are internally consistent and within protocol limits.
     /// @dev One error per violated condition rather than a single generic failure, so a bad
@@ -45,6 +52,14 @@ library AssayConfigLib {
             revert IAssayErrors.AssayHook__MaxFeeAboveProtocolLimit(
                 config.maxFeePips, LPFeeLibrary.MAX_LP_FEE
             );
+        }
+        if (config.captureShareBps == 0 || config.captureShareBps > MAX_CAPTURE_SHARE_BPS) {
+            revert IAssayErrors.AssayHook__CaptureShareOutOfRange(
+                config.captureShareBps, MAX_CAPTURE_SHARE_BPS
+            );
+        }
+        if (config.referenceOracle == address(0)) {
+            revert IAssayErrors.AssayHook__ReferenceOracleIsZeroAddress();
         }
         _validateDecay(config.varianceLambdaX32);
         _validateDecay(config.ofiLambdaX32);

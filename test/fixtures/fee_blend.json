@@ -1,0 +1,200 @@
+[
+  {
+    "drift": -5000,
+    "share": 2500,
+    "quote": 100,
+    "overflow": 0
+  },
+  {
+    "drift": -500,
+    "share": 2500,
+    "quote": 100,
+    "overflow": 0
+  },
+  {
+    "drift": -100,
+    "share": 2500,
+    "quote": 100,
+    "overflow": 0
+  },
+  {
+    "drift": -10,
+    "share": 2500,
+    "quote": 250,
+    "overflow": 0
+  },
+  {
+    "drift": 0,
+    "share": 2500,
+    "quote": 500,
+    "overflow": 0
+  },
+  {
+    "drift": 10,
+    "share": 2500,
+    "quote": 750,
+    "overflow": 0
+  },
+  {
+    "drift": 100,
+    "share": 2500,
+    "quote": 3000,
+    "overflow": 0
+  },
+  {
+    "drift": 190,
+    "share": 2500,
+    "quote": 5250,
+    "overflow": 0
+  },
+  {
+    "drift": 400,
+    "share": 2500,
+    "quote": 10000,
+    "overflow": 500
+  },
+  {
+    "drift": 5000,
+    "share": 2500,
+    "quote": 10000,
+    "overflow": 115500
+  },
+  {
+    "drift": 200000,
+    "share": 2500,
+    "quote": 10000,
+    "overflow": 1000000
+  },
+  {
+    "drift": -5000,
+    "share": 5000,
+    "quote": 100,
+    "overflow": 0
+  },
+  {
+    "drift": -500,
+    "share": 5000,
+    "quote": 100,
+    "overflow": 0
+  },
+  {
+    "drift": -100,
+    "share": 5000,
+    "quote": 100,
+    "overflow": 0
+  },
+  {
+    "drift": -10,
+    "share": 5000,
+    "quote": 100,
+    "overflow": 0
+  },
+  {
+    "drift": 0,
+    "share": 5000,
+    "quote": 500,
+    "overflow": 0
+  },
+  {
+    "drift": 10,
+    "share": 5000,
+    "quote": 1000,
+    "overflow": 0
+  },
+  {
+    "drift": 100,
+    "share": 5000,
+    "quote": 5500,
+    "overflow": 0
+  },
+  {
+    "drift": 190,
+    "share": 5000,
+    "quote": 10000,
+    "overflow": 0
+  },
+  {
+    "drift": 400,
+    "share": 5000,
+    "quote": 10000,
+    "overflow": 10500
+  },
+  {
+    "drift": 5000,
+    "share": 5000,
+    "quote": 10000,
+    "overflow": 240500
+  },
+  {
+    "drift": 200000,
+    "share": 5000,
+    "quote": 10000,
+    "overflow": 1000000
+  },
+  {
+    "drift": -5000,
+    "share": 10000,
+    "quote": 100,
+    "overflow": 0
+  },
+  {
+    "drift": -500,
+    "share": 10000,
+    "quote": 100,
+    "overflow": 0
+  },
+  {
+    "drift": -100,
+    "share": 10000,
+    "quote": 100,
+    "overflow": 0
+  },
+  {
+    "drift": -10,
+    "share": 10000,
+    "quote": 100,
+    "overflow": 0
+  },
+  {
+    "drift": 0,
+    "share": 10000,
+    "quote": 500,
+    "overflow": 0
+  },
+  {
+    "drift": 10,
+    "share": 10000,
+    "quote": 1500,
+    "overflow": 0
+  },
+  {
+    "drift": 100,
+    "share": 10000,
+    "quote": 10000,
+    "overflow": 500
+  },
+  {
+    "drift": 190,
+    "share": 10000,
+    "quote": 10000,
+    "overflow": 9500
+  },
+  {
+    "drift": 400,
+    "share": 10000,
+    "quote": 10000,
+    "overflow": 30500
+  },
+  {
+    "drift": 5000,
+    "share": 10000,
+    "quote": 10000,
+    "overflow": 490500
+  },
+  {
+    "drift": 200000,
+    "share": 10000,
+    "quote": 10000,
+    "overflow": 1000000
+  }
+]

@@ -37,25 +37,43 @@ contract PoolSwapTest_Integration is AssayTestBase {
         return SwapFeeEventAsserter.getSwapFeeFromEvent(logs);
     }
 
-    function test_Swap_ChargesConfiguredBaseFee() public {
-        assertEq(_swap(true, -1 ether), BASE_FEE_PIPS, "fee charged is not the configured base fee");
+    /// @dev A pool sitting exactly at its reference has no drift to price, so it quotes the
+    ///      base fee. This is the anchor the surcharge is measured from.
+    function test_Swap_AlignedPoolQuotesTheBaseFee() public {
+        assertEq(_swap(true, -1 ether), BASE_FEE_PIPS, "an aligned pool must quote the base fee");
     }
 
-    function test_Swap_ChargesBaseFeeInBothDirections() public {
-        assertEq(_swap(true, -1 ether), BASE_FEE_PIPS, "zeroForOne");
-        assertEq(_swap(false, -1 ether), BASE_FEE_PIPS, "oneForZero");
+    /// @dev The property the whole mechanism exists to provide: with the pool drifted from
+    ///      its reference, the direction that captures that drift is quoted more than the
+    ///      direction that does not. A volatility-conditioned fee cannot distinguish these.
+    function test_Swap_QuotesDirectionsDifferentlyOnceThePoolHasDrifted() public {
+        _swap(true, -1 ether);
+
+        uint24 tradingAway = _swap(true, -0.001 ether);
+        uint24 tradingBack = _swap(false, -0.001 ether);
+
+        assertGt(tradingBack, tradingAway, "capturing drift must cost more than adding to it");
+        assertGe(tradingAway, MIN_FEE_PIPS, "quote fell through the floor");
+        assertLe(tradingBack, MAX_FEE_PIPS, "quote broke through the ceiling");
     }
 
     /// @dev The unspecified currency is the input on an exact-output swap, which is the case
     ///      the surcharge in a later milestone must handle correctly.
-    function test_Swap_ChargesBaseFeeOnExactOutput() public {
-        assertEq(_swap(true, 1 ether), BASE_FEE_PIPS, "exact output");
+    /// @dev The unspecified currency is the input on an exact-output swap, which is the case
+    ///      the surcharge in a later milestone must handle correctly.
+    function test_Swap_AlignedPoolQuotesTheBaseFeeOnExactOutput() public {
+        assertEq(_swap(true, 1 ether), BASE_FEE_PIPS, "exact output on an aligned pool");
     }
 
-    function test_Swap_ChargesBaseFeeForEverySwapInABlock() public {
-        assertEq(_swap(true, -0.5 ether), BASE_FEE_PIPS, "first of block");
-        assertEq(_swap(true, -0.5 ether), BASE_FEE_PIPS, "second of block");
-        assertEq(_swap(false, -0.5 ether), BASE_FEE_PIPS, "third of block");
+    /// @dev Every quote, whatever the drift, stays inside the configured bounds. This is
+    ///      the invariant a router relies on when it reads `feeBounds()` before routing.
+    function test_Swap_EveryQuoteInABlockStaysWithinBounds() public {
+        uint24[3] memory quotes = [_swap(true, -0.5 ether), _swap(true, -0.5 ether), _swap(false, -0.5 ether)];
+
+        for (uint256 i = 0; i < quotes.length; ++i) {
+            assertGe(quotes[i], MIN_FEE_PIPS, "quote below floor");
+            assertLe(quotes[i], MAX_FEE_PIPS, "quote above ceiling");
+        }
     }
 
     function test_AfterInitialize_SeedsStoredLpFee() public view {
@@ -87,8 +105,13 @@ contract PoolSwapTest_Integration is AssayTestBase {
         assertEq(IPoolManager(address(manager)).getNonzeroDeltaCount(), 0, "hook left an unsettled delta");
     }
 
-    function testFuzz_Swap_AlwaysChargesBaseFee(bool zeroForOne, uint128 amount) public {
+    /// @dev Whatever the pool state, the quote the manager applies is inside the bounds the
+    ///      hook advertises. A quote outside them would mean a router was misled.
+    function testFuzz_Swap_QuoteAlwaysWithinAdvertisedBounds(bool zeroForOne, uint128 amount) public {
         amount = uint128(bound(amount, 0.0001 ether, 10 ether));
-        assertEq(_swap(zeroForOne, -int256(uint256(amount))), BASE_FEE_PIPS);
+        uint24 charged = _swap(zeroForOne, -int256(uint256(amount)));
+
+        assertGe(charged, MIN_FEE_PIPS, "quote below advertised floor");
+        assertLe(charged, MAX_FEE_PIPS, "quote above advertised ceiling");
     }
 }

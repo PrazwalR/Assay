@@ -63,6 +63,29 @@ class RpcSpec:
 
 
 @dataclass(frozen=True)
+class ReferenceSpec:
+    """The venue and candle resolution the markout label is measured against."""
+
+    venue: str
+    symbol: str
+    base_url: str
+    candle_interval: str
+    candle_interval_seconds: int
+    page_limit: int
+    request_sleep_seconds: float
+
+    def __post_init__(self) -> None:
+        if not self.base_url.startswith("https://"):
+            raise ConfigError(f"reference base url must be https: {self.base_url}")
+        if self.candle_interval_seconds < 1:
+            raise ConfigError("candle_interval_seconds must be >= 1")
+        if not 1 <= self.page_limit <= 1_000:
+            raise ConfigError(f"page_limit out of range: {self.page_limit}")
+        if self.request_sleep_seconds < 0:
+            raise ConfigError("request_sleep_seconds must be non-negative")
+
+
+@dataclass(frozen=True)
 class LabelSpec:
     """Forward-markout labelling parameters."""
 
@@ -88,6 +111,24 @@ class LabelSpec:
         if not self.threshold_multiples or any(k < 1 for k in self.threshold_multiples):
             raise ConfigError(
                 f"threshold multiples must all be >= 1: {self.threshold_multiples}"
+            )
+
+    def validate_against(self, reference: ReferenceSpec) -> None:
+        """
+        Reject horizons the reference data cannot express.
+
+        A markout resolves to the first candle closing at or after the target time, so a
+        horizon shorter than the candle interval silently becomes a longer and variable
+        one: a "30 second" markout against 1-minute candles is really 30 to 90 seconds
+        depending on where in the minute the swap landed. The label would then be named
+        for a measurement the data does not support.
+        """
+        shortest = min(self.horizons_seconds)
+        if shortest < reference.candle_interval_seconds:
+            raise ConfigError(
+                f"shortest markout horizon {shortest}s is below the reference candle "
+                f"interval {reference.candle_interval_seconds}s; the label cannot resolve "
+                f"a horizon finer than the data"
             )
 
 
@@ -166,8 +207,7 @@ class CalibrationConfig:
     labels: LabelSpec
     features: FeatureSpec
     gate: GateSpec
-    reference_symbol: str
-    reference_venue: str
+    reference: ReferenceSpec
     days: float
     data_dir: Path
     end_block_lag: int = field(default=300)
@@ -177,14 +217,14 @@ class CalibrationConfig:
             raise ConfigError(f"days must be positive: {self.days}")
         if self.end_block_lag < 0:
             raise ConfigError("end_block_lag must be non-negative")
-        if self.reference_venue not in _REFERENCE_VENUES:
-            raise ConfigError(
-                f"unknown reference venue {self.reference_venue}; "
-                f"expected one of {sorted(_REFERENCE_VENUES)}"
-            )
+        self.labels.validate_against(self.reference)
 
 
-_REFERENCE_VENUES = {"binance", "coinbase"}
+# Only venues with a working fetch implementation. Listing one here that fetch.py does not
+# handle means a config validates cleanly and then fails deep into a data pull, after
+# minutes of RPC work -- the opposite of failing fast.
+_CANDLE_SECONDS = {"1s": 1, "1m": 60, "5m": 300}
+_VENUE_BASE_URLS = {"binance": "https://api.binance.com/api/v3/klines"}
 
 # Canonical Uniswap v3 USDC/WETH 0.05% pool. token0/token1 orientation is asserted
 # against the chain in fetch.verify_pool_orientation before any pricing is done.
@@ -217,6 +257,35 @@ def _env_int(name: str, default: int) -> int:
         return int(raw)
     except ValueError as exc:
         raise ConfigError(f"{name} must be an integer, got {raw!r}") from exc
+
+
+def _load_reference() -> ReferenceSpec:
+    """
+    Build the reference-price spec.
+
+    The candle interval is a labelling decision, not a transport detail: it sets the finest
+    markout horizon the data can express, so it lives in config and is checked against the
+    declared horizons rather than sitting as a literal inside a request body.
+    """
+    interval = os.environ.get("ASSAY_REFERENCE_INTERVAL", "1s")
+    if interval not in _CANDLE_SECONDS:
+        raise ConfigError(
+            f"unsupported candle interval {interval!r}; expected one of {sorted(_CANDLE_SECONDS)}"
+        )
+    venue = os.environ.get("ASSAY_REFERENCE_VENUE", "binance")
+    if venue not in _VENUE_BASE_URLS:
+        raise ConfigError(
+            f"unknown reference venue {venue!r}; expected one of {sorted(_VENUE_BASE_URLS)}"
+        )
+    return ReferenceSpec(
+        venue=venue,
+        symbol=os.environ.get("ASSAY_REFERENCE_SYMBOL", "ETHUSDT"),
+        base_url=_VENUE_BASE_URLS[venue],
+        candle_interval=interval,
+        candle_interval_seconds=_CANDLE_SECONDS[interval],
+        page_limit=_env_int("ASSAY_REFERENCE_PAGE_LIMIT", 1_000),
+        request_sleep_seconds=_env_float("ASSAY_REFERENCE_SLEEP_SECONDS", 0.12),
+    )
 
 
 def load_config() -> CalibrationConfig:
@@ -281,8 +350,7 @@ def load_config() -> CalibrationConfig:
             min_fold_test_rows=_env_int("ASSAY_GATE_MIN_FOLD_TEST_ROWS", 50),
             min_fold_train_rows=_env_int("ASSAY_GATE_MIN_FOLD_TRAIN_ROWS", 100),
         ),
-        reference_symbol=os.environ.get("ASSAY_REFERENCE_SYMBOL", "ETHUSDT"),
-        reference_venue=os.environ.get("ASSAY_REFERENCE_VENUE", "binance"),
+        reference=_load_reference(),
         days=_env_float("ASSAY_DAYS", 7.0),
         data_dir=Path(os.environ.get("ASSAY_DATA_DIR", str(repo_root / "data"))),
     )

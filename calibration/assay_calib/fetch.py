@@ -162,31 +162,29 @@ def fetch_block_times(client: RpcClient, blocks: list[int]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def fetch_reference_prices(
-    cfg: CalibrationConfig, start_ms: int, end_ms: int
-) -> pd.DataFrame:
+def fetch_reference_prices(cfg: CalibrationConfig, start_ms: int, end_ms: int) -> pd.DataFrame:
     """
-    Pull 1-minute reference candles from the configured CEX.
+    Pull reference candles at the configured resolution.
 
-    Only `open_time` and `close` are retained. `close` of a candle is the price at that
-    candle's end, so aligning a swap to the candle that *closed at or before* the swap
-    keeps the reference strictly in the past. That alignment is enforced in features.py.
+    Only `close_time` and `close` are retained. A candle's close is the price at that
+    candle's end, so aligning a swap to the candle that closed at or before it keeps the
+    reference strictly in the past; that alignment is enforced in features.py.
     """
-    if cfg.reference_venue != "binance":
-        raise NotImplementedError(f"reference venue {cfg.reference_venue} not implemented")
-
+    spec = cfg.reference
     rows: list[dict] = []
     cursor = start_ms
     session = requests.Session()
+    pages = 0
+
     while cursor < end_ms:
         resp = session.get(
-            "https://api.binance.com/api/v3/klines",
+            spec.base_url,
             params={
-                "symbol": cfg.reference_symbol,
-                "interval": "1m",
+                "symbol": spec.symbol,
+                "interval": spec.candle_interval,
                 "startTime": cursor,
                 "endTime": end_ms,
-                "limit": 1000,
+                "limit": spec.page_limit,
             },
             timeout=cfg.rpc.request_timeout_seconds,
         )
@@ -194,17 +192,22 @@ def fetch_reference_prices(
         batch = resp.json()
         if not batch:
             break
-        for k in batch:
-            rows.append({"close_time_ms": int(k[6]), "ref_price": float(k[4])})
+        for candle in batch:
+            rows.append({"close_time_ms": int(candle[6]), "ref_price": float(candle[4])})
         cursor = int(batch[-1][6]) + 1
-        time.sleep(0.2)
+        pages += 1
+        if pages % 50 == 0:
+            log.info("reference: %d pages, %d candles so far", pages, len(rows))
+        time.sleep(spec.request_sleep_seconds)
 
     if not rows:
         raise RuntimeError("reference price fetch returned no candles")
+
     df = pd.DataFrame(rows).drop_duplicates("close_time_ms").sort_values("close_time_ms")
     log.info(
-        "reference: %d candles, %s to %s",
+        "reference: %d candles at %s, %s to %s",
         len(df),
+        spec.candle_interval,
         pd.to_datetime(df["close_time_ms"].iloc[0], unit="ms"),
         pd.to_datetime(df["close_time_ms"].iloc[-1], unit="ms"),
     )

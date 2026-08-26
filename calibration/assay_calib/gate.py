@@ -132,6 +132,7 @@ def run_gate(
     cfg: CalibrationConfig,
     label_column: str,
     markout_column: str | None = None,
+    features: tuple[str, ...] = FEATURE_COLUMNS,
 ) -> GateResult:
     """
     Fit the logistic classifier and evaluate it out of sample.
@@ -144,10 +145,8 @@ def run_gate(
     split_at = int(len(df) * (1.0 - cfg.gate.test_fraction))
     train, test = df.iloc[:split_at], df.iloc[split_at:]
 
-    x_train = _winsorize(train[list(FEATURE_COLUMNS)].astype("float64"), cfg)
-    x_test = test[list(FEATURE_COLUMNS)].astype("float64").clip(
-        x_train.min(), x_train.max(), axis=1
-    )
+    x_train = _winsorize(train[list(features)].astype("float64"), cfg)
+    x_test = test[list(features)].astype("float64").clip(x_train.min(), x_train.max(), axis=1)
     y_train = train[label_column].to_numpy()
     y_test = test[label_column].to_numpy()
 
@@ -186,7 +185,7 @@ def run_gate(
         base_rate=float(np.mean(np.concatenate([y_train, y_test]))),
         auc_train=float(roc_auc_score(y_train, p_train)),
         auc_test=float(roc_auc_score(y_test, p_test)),
-        coefficients=dict(zip(FEATURE_COLUMNS, model.coef_[0], strict=True)),
+        coefficients=dict(zip(features, model.coef_[0], strict=True)),
         confusion={"tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp)},
         threshold=float(threshold),
         spearman_markout=spearman,
@@ -270,3 +269,49 @@ def permutation_auc(df: pd.DataFrame, cfg: CalibrationConfig, label_column: str)
     rng = np.random.default_rng(cfg.gate.random_seed)
     shuffled[label_column] = rng.permutation(shuffled[label_column].to_numpy())
     return run_gate(shuffled, cfg, label_column).auc_test
+
+
+# Which features a hook could actually compute, split by what each requires on chain. The
+# oracle-only set is what a dynamic-fee hook reading a price feed could already do today;
+# the on-chain set needs no external reference at all.
+FEATURE_SETS: dict[str, tuple[str, ...]] = {
+    "oracle_only": ("signed_mispricing",),
+    "onchain_only": ("is_first_of_block", "size_ratio", "direction_vs_drift", "ofi_ewma"),
+    "full": FEATURE_COLUMNS,
+}
+
+
+@dataclass(frozen=True)
+class IncrementalValue:
+    """
+    How much the microstructure features add over simply reading a price oracle.
+
+    This is the product question, not a diagnostic. If the full model scores no better than
+    `oracle_only`, then Assay is an oracle-based dynamic fee with extra gas and extra attack
+    surface, whatever its headline AUC happens to be. If `onchain_only` is close to `full`,
+    the hook can drop its oracle dependency entirely.
+    """
+
+    auc: dict[str, float]
+
+    @property
+    def gain_over_oracle(self) -> float:
+        return self.auc["full"] - self.auc["oracle_only"]
+
+    @property
+    def gain_over_onchain(self) -> float:
+        return self.auc["full"] - self.auc["onchain_only"]
+
+
+def incremental_value(
+    df: pd.DataFrame, cfg: CalibrationConfig, label_column: str
+) -> IncrementalValue:
+    """Fits each feature subset on the identical split and returns their out-of-sample AUC."""
+    scores: dict[str, float] = {}
+    for name, features in FEATURE_SETS.items():
+        try:
+            scores[name] = run_gate(df, cfg, label_column, features=features).auc_test
+        except ValueError as exc:
+            log.warning("feature set %s could not be fitted: %s", name, exc)
+            scores[name] = float("nan")
+    return IncrementalValue(auc=scores)

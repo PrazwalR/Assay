@@ -32,7 +32,9 @@ contract DeployAssay is Script {
             maxFeePips: uint24(vm.envUint("ASSAY_MAX_FEE_PIPS")),
             varianceLambdaX32: uint64(vm.envUint("ASSAY_VARIANCE_LAMBDA_X32")),
             ofiLambdaX32: uint64(vm.envUint("ASSAY_OFI_LAMBDA_X32")),
-            maxTickDeltaPerBlock: int24(vm.envInt("ASSAY_MAX_TICK_DELTA_PER_BLOCK"))
+            maxTickDeltaPerBlock: int24(vm.envInt("ASSAY_MAX_TICK_DELTA_PER_BLOCK")),
+            captureShareBps: uint24(vm.envUint("ASSAY_CAPTURE_SHARE_BPS")),
+            referenceOracle: vm.envAddress("ASSAY_REFERENCE_ORACLE")
         });
         return deploy(IPoolManager(AddressConstants.getPoolManagerAddress(block.chainid)), config);
     }

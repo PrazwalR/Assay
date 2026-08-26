@@ -12,6 +12,7 @@ import {VarianceEwma} from "../../src/libraries/VarianceEwma.sol";
 
 contract AssayConfigTest is Test {
     uint64 internal constant VALID_LAMBDA = 4_037_269_258;
+    address internal constant ORACLE = address(0xA55A4);
 
     function _config(uint24 base, uint24 min, uint24 max) internal pure returns (AssayConfig memory) {
         return AssayConfig({
@@ -20,7 +21,9 @@ contract AssayConfigTest is Test {
             maxFeePips: max,
             varianceLambdaX32: VALID_LAMBDA,
             ofiLambdaX32: VALID_LAMBDA,
-            maxTickDeltaPerBlock: 1000
+            maxTickDeltaPerBlock: 1000,
+            captureShareBps: 5000,
+            referenceOracle: ORACLE
         });
     }
 
@@ -128,6 +131,50 @@ contract AssayConfigTest is Test {
 
     function test_Validate_AcceptsDecayAtTheStallBoundary() public view {
         this.validateExternal(_withDecay(Q32x32.ONE - AssayConfigLib.MIN_DECAY_GAP, VALID_LAMBDA));
+    }
+
+    /// @dev The mispricing signal is the hook's primary input, so a deployment with no
+    ///      reference source cannot price anything and must fail at construction.
+    function test_RevertWhen_CaptureShareIsZero() public {
+        AssayConfig memory c = _config(500, 100, 10_000);
+        c.captureShareBps = 0;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAssayErrors.AssayHook__CaptureShareOutOfRange.selector,
+                uint24(0),
+                AssayConfigLib.MAX_CAPTURE_SHARE_BPS
+            )
+        );
+        this.validateExternal(c);
+    }
+
+    /// @dev A share above 100% charges more than the drift being captured, which deters the
+    ///      arbitrage entirely and leaves the pool stale -- the failure mode the mechanism
+    ///      exists to avoid.
+    function test_RevertWhen_CaptureShareExceedsFullDrift() public {
+        AssayConfig memory c = _config(500, 100, 10_000);
+        c.captureShareBps = AssayConfigLib.MAX_CAPTURE_SHARE_BPS + 1;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAssayErrors.AssayHook__CaptureShareOutOfRange.selector,
+                AssayConfigLib.MAX_CAPTURE_SHARE_BPS + 1,
+                AssayConfigLib.MAX_CAPTURE_SHARE_BPS
+            )
+        );
+        this.validateExternal(c);
+    }
+
+    function test_Validate_AcceptsCaptureShareAtFullDrift() public view {
+        AssayConfig memory c = _config(500, 100, 10_000);
+        c.captureShareBps = AssayConfigLib.MAX_CAPTURE_SHARE_BPS;
+        this.validateExternal(c);
+    }
+
+    function test_RevertWhen_ReferenceOracleIsUnset() public {
+        AssayConfig memory c = _config(500, 100, 10_000);
+        c.referenceOracle = address(0);
+        vm.expectRevert(IAssayErrors.AssayHook__ReferenceOracleIsZeroAddress.selector);
+        this.validateExternal(c);
     }
 
     function test_RevertWhen_OrderFlowDecayIsZero() public {

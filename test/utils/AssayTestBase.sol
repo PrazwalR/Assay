@@ -18,6 +18,8 @@ import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 
 import {AssayHook} from "../../src/AssayHook.sol";
 import {AssayConfig} from "../../src/config/AssayConfig.sol";
+import {ChainlinkReferenceAdapter, IAggregatorV3} from "../../src/oracle/ChainlinkReferenceAdapter.sol";
+import {MockAggregatorV3} from "../mocks/MockAggregatorV3.sol";
 
 /// @dev Shared harness that stands up a real PoolManager, a mined hook, and a funded
 ///      dynamic-fee pool. A genuine PoolManager is deployed rather than a stand-in so the
@@ -40,6 +42,14 @@ abstract contract AssayTestBase is Test {
     uint64 internal constant OFI_LAMBDA_X32 = 4_235_837_212;
     int24 internal constant MAX_TICK_DELTA = 1000;
 
+    /// @dev Both test tokens use 18 decimals and the mock feed uses 8, so the decimal
+    ///      scaling is 10 ** (18 - 18 + 8). See ChainlinkReferenceAdapter.PRICE_NUMERATOR.
+    uint256 internal constant PRICE_NUMERATOR = 1e8;
+    uint256 internal constant ORACLE_MAX_AGE = 3600;
+
+    /// @dev Charge half the drift a swap captures. A test fixture, not a calibrated value.
+    uint24 internal constant CAPTURE_SHARE_BPS = 5000;
+
     PoolManager internal manager;
     AssayHook internal hook;
     PoolSwapTest internal swapRouter;
@@ -48,6 +58,8 @@ abstract contract AssayTestBase is Test {
     MockERC20 internal token0;
     MockERC20 internal token1;
     PoolKey internal poolKey;
+    MockAggregatorV3 internal feed;
+    ChainlinkReferenceAdapter internal oracle;
 
     function setUp() public virtual {
         manager = new PoolManager(address(this));
@@ -55,19 +67,32 @@ abstract contract AssayTestBase is Test {
         liquidityRouter = new PoolModifyLiquidityTest(IPoolManager(address(manager)));
 
         (token0, token1) = _deploySortedTokens();
+
+        // A price of 1.0 between two 18-decimal tokens puts the reference at tick 0, which is
+        // where the pool is initialised, so the pool starts perfectly aligned.
+        feed = new MockAggregatorV3(int256(1e8), block.timestamp);
+        oracle = new ChainlinkReferenceAdapter(
+            IAggregatorV3(address(feed)),
+            ORACLE_MAX_AGE,
+            PRICE_NUMERATOR,
+            Currency.wrap(address(token0)),
+            Currency.wrap(address(token1))
+        );
         hook = _deployHook(_defaultConfig());
         poolKey = _initialisePool(address(hook));
         _addLiquidity();
     }
 
-    function _defaultConfig() internal pure returns (AssayConfig memory) {
+    function _defaultConfig() internal view returns (AssayConfig memory) {
         return AssayConfig({
             baseFeePips: BASE_FEE_PIPS,
             minFeePips: MIN_FEE_PIPS,
             maxFeePips: MAX_FEE_PIPS,
             varianceLambdaX32: VARIANCE_LAMBDA_X32,
             ofiLambdaX32: OFI_LAMBDA_X32,
-            maxTickDeltaPerBlock: MAX_TICK_DELTA
+            maxTickDeltaPerBlock: MAX_TICK_DELTA,
+            captureShareBps: CAPTURE_SHARE_BPS,
+            referenceOracle: address(oracle)
         });
     }
 

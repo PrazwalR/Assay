@@ -32,4 +32,22 @@ interface IAssayEvents {
     /// @param observedDelta The tick delta actually observed across the block.
     /// @param clampedTo The bound it was truncated to.
     event TickDeltaClamped(PoolId indexed poolId, int256 observedDelta, int24 clampedTo);
+
+    /// @notice Emitted when the reference price source starts or stops producing usable
+    ///         readings for a pool.
+    /// @dev Emitted only on transition, not per swap. A pool that goes stale is quoting
+    ///      without a view of its own drift, which is the condition an operator most needs
+    ///      to know about.
+    /// @param poolId The pool whose reference changed state.
+    /// @param fresh Whether the reference is now usable.
+    event ReferenceFreshnessChanged(PoolId indexed poolId, bool fresh);
+
+    /// @notice Emitted when a swap's drift exceeded what the percentage-of-notional fee
+    ///         could express, and the remainder was taken and donated to in-range liquidity.
+    /// @dev Rare by construction: it requires a dislocation large enough that the uncapped
+    ///      fee formula exceeds `maxFeePips`, which does not happen on ordinary swaps.
+    /// @param poolId The pool the donation was made to.
+    /// @param amount The amount donated, in the swap's unspecified currency.
+    /// @param inCurrency0 Whether that currency was `key.currency0`.
+    event ToxicitySurchargeDonated(PoolId indexed poolId, uint256 amount, bool inCurrency0);
 }

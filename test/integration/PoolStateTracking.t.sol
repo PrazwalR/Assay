@@ -120,22 +120,28 @@ contract PoolStateTrackingTest is AssayTestBase {
 
         // Truncation is the operation here: each cast slices the bit range the compiler
         // packed that field into, and a wrong width is exactly what this test exists to catch.
-        // Offsets follow declaration order: lastTick 0, blockOpenTick 24, lastBlock 48,
-        // varEwmaX32 80, ofiEwmaX32 144 -- 208 bits of the 256 available.
+        // Offsets follow declaration order: lastTick 0, blockOpenTick 24, referenceTick 48,
+        // lastBlock 72, varEwmaX32 104, ofiEwmaX32 168, referenceFresh 232 -- 240 bits of
+        // the 256 available.
         // forge-lint: disable-next-line(unsafe-typecast)
         int24 lastTick = int24(uint24(word));
         // forge-lint: disable-next-line(unsafe-typecast)
         int24 blockOpenTick = int24(uint24(word >> 24));
         // forge-lint: disable-next-line(unsafe-typecast)
-        uint32 lastBlock = uint32(word >> 48);
+        int24 referenceTick = int24(uint24(word >> 48));
         // forge-lint: disable-next-line(unsafe-typecast)
-        uint64 varEwmaX32 = uint64(word >> 80);
+        uint32 lastBlock = uint32(word >> 72);
         // forge-lint: disable-next-line(unsafe-typecast)
-        int64 ofiEwmaX32 = int64(uint64(word >> 144));
+        uint64 varEwmaX32 = uint64(word >> 104);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        int64 ofiEwmaX32 = int64(uint64(word >> 168));
+        bool referenceFresh = ((word >> 232) & 0xFF) != 0;
 
         PoolState memory state = _state();
         assertEq(lastTick, state.lastTick, "lastTick not in the expected bits");
         assertEq(blockOpenTick, state.blockOpenTick, "blockOpenTick not in the expected bits");
+        assertEq(referenceTick, state.referenceTick, "referenceTick not in the expected bits");
+        assertEq(referenceFresh, state.referenceFresh, "referenceFresh not in the expected bits");
         assertEq(lastBlock, state.lastBlock, "lastBlock not in the expected bits");
         assertEq(varEwmaX32, state.varEwmaX32, "variance not in the expected bits");
         assertEq(ofiEwmaX32, state.ofiEwmaX32, "imbalance not in the expected bits");

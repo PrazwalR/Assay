@@ -20,7 +20,12 @@ optimizer_runs = 800
 # dominates deploy cost. 800 favours runtime without pushing the hook past the 24kB limit;
 # revisit only with a measured gas delta from test/gas.
 ffi = false
-fs_permissions = [{ access = "read", path = "./out" }]
+# Read-only, and scoped to the two paths that need it: build artifacts, and the shared
+# fee fixture that pins the Solidity and Python implementations to the same values.
+fs_permissions = [
+    { access = "read", path = "./out" },
+    { access = "read", path = "./test/fixtures" },
+]
 
 gas_reports = ["AssayHook"]
 
