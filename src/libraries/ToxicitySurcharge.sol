@@ -5,6 +5,8 @@ import {FullMath} from "v4-core/libraries/FullMath.sol";
 import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
 import {SwapParams} from "v4-core/types/PoolOperation.sol";
 
+import {FeeBlend} from "./FeeBlend.sol";
+
 /// @notice Turns a fee-cap overflow, in pips, into an absolute amount in the swap's
 ///         unspecified currency.
 /// @dev `FeeBlend.quote` cannot express a surcharge beyond `maxFeePips`, because it charges
@@ -49,6 +51,10 @@ library ToxicitySurcharge {
     /// @param overflowPips The cap overflow from `FeeBlend.ceilingOverflowPips`, in pips.
     /// @return amount The amount to take from the swapper and donate to liquidity providers.
     function surchargeAmount(uint256 notional, uint24 overflowPips) internal pure returns (uint256 amount) {
-        return FullMath.mulDiv(notional, overflowPips, 1_000_000);
+        // The denominator is FeeBlend's own overflow ceiling, imported rather than repeated.
+        // The guarantee that the surcharge never exceeds `notional` -- which is what makes
+        // the int128 cast at the call site exact -- holds only while these two are equal, and
+        // two matching literals in two files is not a guarantee.
+        return FullMath.mulDiv(notional, overflowPips, FeeBlend.MAX_OVERFLOW_PIPS);
     }
 }

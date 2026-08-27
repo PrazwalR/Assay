@@ -20,7 +20,10 @@ __pycache__/
 .ruff_cache/
 .ipynb_checkpoints/
 
-*.md
+# Scratch prose and vendored reference dumps stay out of the tree; everything else in
+# docs/ and the top-level project documents are tracked deliberately.
+uniswap.md
+mathref.md
 
 
 .DS_Store

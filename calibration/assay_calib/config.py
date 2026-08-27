@@ -109,9 +109,7 @@ class LabelSpec:
                 f"{self.threshold_multiples}"
             )
         if not self.threshold_multiples or any(k < 1 for k in self.threshold_multiples):
-            raise ConfigError(
-                f"threshold multiples must all be >= 1: {self.threshold_multiples}"
-            )
+            raise ConfigError(f"threshold multiples must all be >= 1: {self.threshold_multiples}")
 
     def validate_against(self, reference: ReferenceSpec) -> None:
         """
@@ -304,9 +302,7 @@ def load_config() -> CalibrationConfig:
             # Only endpoints verified to serve complete eth_getLogs. flashbots returns an
             # empty result set with no error and merkle does not implement the method, so
             # including them here would silently truncate the dataset.
-            log_urls=tuple(
-                os.environ.get("ASSAY_RPC_LOG_URLS", "https://eth.drpc.org").split(",")
-            ),
+            log_urls=tuple(os.environ.get("ASSAY_RPC_LOG_URLS", "https://eth.drpc.org").split(",")),
             log_chunk_blocks=_env_int("ASSAY_LOG_CHUNK_BLOCKS", 1_000),
             max_workers=_env_int("ASSAY_RPC_MAX_WORKERS", 12),
             max_retries=_env_int("ASSAY_RPC_MAX_RETRIES", 5),

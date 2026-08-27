@@ -25,15 +25,25 @@ contract DeployAssay is Script {
 
     /// @notice Reads configuration from the environment and deploys to the current chain.
     /// @return hook The deployed hook.
+    /// @dev Reads an environment variable that must fit `uint24`, and refuses it if it does
+    ///      not. A bare `uint24(vm.envUint(...))` truncates silently: `16780216` becomes
+    ///      `3000`, and the wrong value is then baked into an immutable at a mined CREATE2
+    ///      address that cannot be redeployed to. Every other layer of this project rejects
+    ///      out-of-range input; the deploy path is the one place it would be irreversible.
+    function _envUint24(string memory name) private view returns (uint24) {
+        uint256 raw = vm.envUint(name);
+        require(raw <= type(uint24).max, string.concat(name, " exceeds uint24"));
+        // The require above is the check this lint asks for.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint24(raw);
+    }
+
     function run() external returns (AssayHook hook) {
         AssayConfig memory config = AssayConfig({
-            baseFeePips: uint24(vm.envUint("ASSAY_BASE_FEE_PIPS")),
-            minFeePips: uint24(vm.envUint("ASSAY_MIN_FEE_PIPS")),
-            maxFeePips: uint24(vm.envUint("ASSAY_MAX_FEE_PIPS")),
-            varianceLambdaX32: uint64(vm.envUint("ASSAY_VARIANCE_LAMBDA_X32")),
-            ofiLambdaX32: uint64(vm.envUint("ASSAY_OFI_LAMBDA_X32")),
-            maxTickDeltaPerBlock: int24(vm.envInt("ASSAY_MAX_TICK_DELTA_PER_BLOCK")),
-            captureShareBps: uint24(vm.envUint("ASSAY_CAPTURE_SHARE_BPS")),
+            baseFeePips: _envUint24("ASSAY_BASE_FEE_PIPS"),
+            minFeePips: _envUint24("ASSAY_MIN_FEE_PIPS"),
+            maxFeePips: _envUint24("ASSAY_MAX_FEE_PIPS"),
+            captureShareBps: _envUint24("ASSAY_CAPTURE_SHARE_BPS"),
             referenceOracle: vm.envAddress("ASSAY_REFERENCE_ORACLE")
         });
         return deploy(IPoolManager(AddressConstants.getPoolManagerAddress(block.chainid)), config);

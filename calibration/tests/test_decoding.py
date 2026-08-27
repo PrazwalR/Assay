@@ -51,7 +51,7 @@ class TestSwapDecoding:
         }
 
     def test_roundtrip_signed_amounts(self) -> None:
-        entry = self._entry(3_000_000_000, -10**18, 1 << 96, 10**21, -197_529)
+        entry = self._entry(3_000_000_000, -(10**18), 1 << 96, 10**21, -197_529)
         out = decode_swap_log(entry)
         assert out["amount0"] == 3_000_000_000
         assert out["amount1"] == -(10**18)
@@ -73,7 +73,9 @@ class TestPriceOrientation:
         opposite directions. Any feature derived from raw tick deltas inverts without this.
         """
         prices = [
-            _sqrt_price_to_eth_usdc(pd.Series([int((1.0001 ** (t / 2)) * (1 << 96))]), DEC0, DEC1)[0]
+            _sqrt_price_to_eth_usdc(pd.Series([int((1.0001 ** (t / 2)) * (1 << 96))]), DEC0, DEC1)[
+                0
+            ]
             for t in (196_000, 197_000, 198_000)
         ]
         assert prices[0] > prices[1] > prices[2]
@@ -120,7 +122,9 @@ class TestSignConventions:
 class TestBigIntSerialisation:
     def test_roundtrip_preserves_exact_uint256(self) -> None:
         big = (1 << 200) + 12_345
-        df = pd.DataFrame({"amount0": [big], "amount1": [-big], "sqrt_price_x96": [1], "liquidity": [2]})
+        df = pd.DataFrame(
+            {"amount0": [big], "amount1": [-big], "sqrt_price_x96": [1], "liquidity": [2]}
+        )
         out = decode_big_ints(encode_big_ints(df))
         assert out["amount0"].iloc[0] == big
         assert out["amount1"].iloc[0] == -big

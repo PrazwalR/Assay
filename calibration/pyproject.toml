@@ -1,0 +1,12 @@
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+# E/F: pyflakes and pycodestyle errors. I: import order. B: bugbear, which catches the
+# mutable-default and loop-variable-binding classes that silently corrupt results.
+# UP: pyupgrade. NPY: numpy-specific correctness.
+select = ["E", "F", "I", "B", "UP", "NPY"]
+
+[tool.ruff.format]
+quote-style = "double"

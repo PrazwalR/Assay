@@ -43,9 +43,6 @@ contract DeployScriptTest is Test {
             baseFeePips: 500,
             minFeePips: 100,
             maxFeePips: 10_000,
-            varianceLambdaX32: 4_037_269_258,
-            ofiLambdaX32: 4_235_837_212,
-            maxTickDeltaPerBlock: 1000,
             captureShareBps: 5000,
             referenceOracle: oracle
         });

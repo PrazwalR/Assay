@@ -10,7 +10,6 @@ from .config import CalibrationConfig
 log = logging.getLogger(__name__)
 
 Q96 = 1 << 96
-LOG_1_0001 = np.log(1.0001)
 
 FEATURE_COLUMNS: tuple[str, ...] = (
     "is_first_of_block",
@@ -85,9 +84,7 @@ def build_frame(
     virtual_eth = (
         df["liquidity_pre"].astype("float64") * df["sqrt_price_pre"].astype("float64") / Q96
     ) / 10.0**dec1
-    df["size_ratio"] = (df["qty_eth_signed"].abs() / virtual_eth).replace(
-        [np.inf, -np.inf], np.nan
-    )
+    df["size_ratio"] = (df["qty_eth_signed"].abs() / virtual_eth).replace([np.inf, -np.inf], np.nan)
 
     # 3. Trading with the recent move. Arbitrage is directional by construction.
     #    Drift is taken on price, not on raw ticks: for a token0=USDC pool a rising tick
@@ -107,10 +104,9 @@ def build_frame(
     #    prevailing imbalance, not the raw imbalance itself.
     alpha = 1.0 - 0.5 ** (1.0 / cfg.features.ofi_halflife_swaps)
     signed_notional = df["direction"] * df["notional_usd"]
-    imbalance = (
-        signed_notional.ewm(alpha=alpha, adjust=False).mean().shift(1)
-        / df["notional_usd"].ewm(alpha=alpha, adjust=False).mean().shift(1)
-    )
+    imbalance = signed_notional.ewm(alpha=alpha, adjust=False).mean().shift(1) / df[
+        "notional_usd"
+    ].ewm(alpha=alpha, adjust=False).mean().shift(1)
     df["ofi_ewma"] = df["direction"] * imbalance
 
     return df
@@ -170,7 +166,9 @@ def attach_markouts(
             # and silently poison every downstream statistic. They are dropped by `clean`
             # via the min-notional filter, but the column must not contain infinities first.
             with np.errstate(divide="ignore", invalid="ignore"):
-                bps = np.where(notional > 0, markout / np.where(notional > 0, notional, 1.0) * 1e4, np.nan)
+                bps = np.where(
+                    notional > 0, markout / np.where(notional > 0, notional, 1.0) * 1e4, np.nan
+                )
             df[f"markout_bps_{variant}_{horizon}s"] = bps
             for k in cfg.labels.threshold_multiples:
                 label = np.where(valid, (markout > k * fee_usd).astype("float64"), np.nan)
@@ -191,6 +189,10 @@ def clean(df: pd.DataFrame, cfg: CalibrationConfig, label_column: str) -> pd.Dat
 
     log.info(
         "clean: %d -> %d rows (dropped %d incomplete, %d below $%.0f notional)",
-        before, len(out), dropped_na, dropped_dust, cfg.features.min_notional_usd,
+        before,
+        len(out),
+        dropped_na,
+        dropped_dust,
+        cfg.features.min_notional_usd,
     )
     return out.reset_index(drop=True)

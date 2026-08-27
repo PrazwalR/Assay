@@ -204,4 +204,6 @@ def compare(
         FeePolicy(f"assay_{int(share)}bps", base, base / 5.0, base * 20.0, share)
         for share in capture_shares_bps
     ]
-    return [run_policy(df, policy, label_column, uninformed_elasticity, base) for policy in policies]
+    return [
+        run_policy(df, policy, label_column, uninformed_elasticity, base) for policy in policies
+    ]

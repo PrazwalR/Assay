@@ -20,7 +20,9 @@ def _load(data_dir: Path, tag: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.Data
     paths = {name: data_dir / f"{name}_{tag}.parquet" for name in ("swaps", "blocks", "reference")}
     missing = [p.name for p in paths.values() if not p.exists()]
     if missing:
-        raise FileNotFoundError(f"missing cached data: {missing}. Run: python fetch_data.py --days N")
+        raise FileNotFoundError(
+            f"missing cached data: {missing}. Run: python fetch_data.py --days N"
+        )
     return (
         decode_big_ints(pd.read_parquet(paths["swaps"])),
         pd.read_parquet(paths["blocks"]),
@@ -61,8 +63,11 @@ def _report(results: list[BacktestResult], elasticity: float, label: str, rows: 
         gain = best.lp_net_usd - baseline.lp_net_usd
         pct = 100.0 * gain / abs(baseline.lp_net_usd) if baseline.lp_net_usd else float("nan")
         print(f"  Best: {best.policy} at {gain:+,.0f} USD ({pct:+.1f}% vs static)")
-        print(f"  Cost: residual drift {best.mean_residual_drift_bps:.2f} bp vs "
-              f"{baseline.mean_residual_drift_bps:.2f} bp, so the pool sits further from its reference.")
+        print(
+            f"  Cost: residual drift {best.mean_residual_drift_bps:.2f} bp vs "
+            f"{baseline.mean_residual_drift_bps:.2f} bp, so the pool sits further "
+            "from its reference."
+        )
     print(f"{'=' * 100}")
 
 
@@ -80,7 +85,10 @@ def _sweep_elasticity(
     print(f"\n{'=' * 100}")
     print("SENSITIVITY -- the uninformed decay is assumed, not measured, so the result is swept")
     print(f"{'=' * 100}")
-    print(f"{'decay/bp':>10}{'retention @20bp':>18}{'best policy':>18}{'LP net gain':>16}{'verdict':>14}")
+    print(
+        f"{'decay/bp':>10}{'retention @20bp':>18}{'best policy':>18}"
+        f"{'LP net gain':>16}{'verdict':>14}"
+    )
     print("-" * 100)
 
     import math
@@ -102,12 +110,17 @@ def _sweep_elasticity(
         print("  Assay wins across every decay tested, including implausibly elastic flow.")
     else:
         print(f"  The static fee wins once the decay reaches {flipped_at:.2f} per basis point,")
-        print(f"  at which a 20bp excess fee retains only {math.exp(-flipped_at * 20):.0%} of uninformed volume.")
+        print(
+            f"  at which a 20bp excess fee retains only "
+            f"{math.exp(-flipped_at * 20):.0%} of uninformed volume."
+        )
     print(f"{'=' * 100}")
 
 
 def main() -> int:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)-7s %(name)s: %(message)s"
+    )
     parser = argparse.ArgumentParser(description="Assay counterfactual fee backtest")
     parser.add_argument("--tag", required=True, help="cached dataset tag")
     parser.add_argument(

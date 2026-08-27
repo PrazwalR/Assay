@@ -68,7 +68,9 @@ class TestArbitrageResponse:
         assert traded == pytest.approx(notional)
 
     def test_fee_above_the_drift_stops_the_trade(self) -> None:
-        traded, _ = _arbitrage_leg(np.array([0.0001]), np.array([1_000.0]), np.array([5_000.0]), 500.0)
+        traded, _ = _arbitrage_leg(
+            np.array([0.0001]), np.array([1_000.0]), np.array([5_000.0]), 500.0
+        )
         assert traded[0] == 0.0
 
     def test_residual_drift_grows_with_the_fee(self) -> None:
@@ -108,13 +110,19 @@ class TestPolicyAccounting:
 
     def test_charging_more_reduces_what_arbitrage_extracts(self) -> None:
         df = self._frame()
-        static = run_policy(df, FeePolicy("static", 500.0, 500.0, 500.0, 0.0), "informed", 0.05, 500.0)
-        assay = run_policy(df, FeePolicy("assay", 500.0, 100.0, 10_000.0, 5_000.0), "informed", 0.05, 500.0)
+        static = run_policy(
+            df, FeePolicy("static", 500.0, 500.0, 500.0, 0.0), "informed", 0.05, 500.0
+        )
+        assay = run_policy(
+            df, FeePolicy("assay", 500.0, 100.0, 10_000.0, 5_000.0), "informed", 0.05, 500.0
+        )
         assert assay.lp_adverse_selection_usd < static.lp_adverse_selection_usd
 
     def test_elasticity_of_zero_retains_all_uninformed_volume(self) -> None:
         df = self._frame()
-        result = run_policy(df, FeePolicy("assay", 500.0, 100.0, 10_000.0, 5_000.0), "informed", 0.0, 500.0)
+        result = run_policy(
+            df, FeePolicy("assay", 500.0, 100.0, 10_000.0, 5_000.0), "informed", 0.0, 500.0
+        )
         assert result.uninformed_volume_usd == pytest.approx(70_000.0)
 
     def test_higher_elasticity_drives_more_uninformed_volume_away(self) -> None:

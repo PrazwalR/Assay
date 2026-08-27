@@ -54,3 +54,15 @@ multiline_func_header = "attributes_first"
 
 [lint]
 lint_on_build = true
+
+# Named endpoints so `--rpc-url base_sepolia` resolves. Without these the variables in
+# .env.example are documentation for a wiring that does not exist.
+[rpc_endpoints]
+base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
+unichain_sepolia = "${UNICHAIN_SEPOLIA_RPC_URL}"
+mainnet = "${MAINNET_RPC_URL}"
+
+# One Etherscan V2 multichain key covers both testnets.
+[etherscan]
+base_sepolia = { key = "${ETHERSCAN_API_KEY}", chain = 84532 }
+unichain_sepolia = { key = "${ETHERSCAN_API_KEY}", chain = 1301 }

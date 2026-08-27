@@ -5,9 +5,9 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+from scipy.stats import spearmanr
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix, roc_auc_score
-from scipy.stats import spearmanr
 from sklearn.preprocessing import StandardScaler
 
 from .config import CalibrationConfig
@@ -62,7 +62,8 @@ def evaluate_verdict(
     weakest_fold = min(folds) if folds else float("nan")
     checks = {
         "auc_above_gate": result.auc_test >= cfg.gate.min_auc,
-        "beats_shuffled_control": (result.auc_test - shuffled_auc) >= cfg.gate.min_permutation_margin,
+        "beats_shuffled_control": (result.auc_test - shuffled_auc)
+        >= cfg.gate.min_permutation_margin,
         "every_fold_holds": bool(folds) and weakest_fold >= cfg.gate.min_fold_auc,
         "enough_test_positives": result.test_positives() >= cfg.gate.min_test_positives,
     }
@@ -237,7 +238,9 @@ def walk_forward_auc(df: pd.DataFrame, cfg: CalibrationConfig, label_column: str
         if len(test) < cfg.gate.min_fold_test_rows or len(train) < cfg.gate.min_fold_train_rows:
             log.warning(
                 "walk-forward fold %d skipped: %d train / %d test rows below minimum",
-                i, len(train), len(test),
+                i,
+                len(train),
+                len(test),
             )
             continue
         y_train, y_test = train[label_column].to_numpy(), test[label_column].to_numpy()
@@ -245,8 +248,8 @@ def walk_forward_auc(df: pd.DataFrame, cfg: CalibrationConfig, label_column: str
             continue
 
         x_train = _winsorize(train[list(FEATURE_COLUMNS)].astype("float64"), cfg)
-        x_test = test[list(FEATURE_COLUMNS)].astype("float64").clip(
-            x_train.min(), x_train.max(), axis=1
+        x_test = (
+            test[list(FEATURE_COLUMNS)].astype("float64").clip(x_train.min(), x_train.max(), axis=1)
         )
         scaler = StandardScaler().fit(x_train)
         model = LogisticRegression(

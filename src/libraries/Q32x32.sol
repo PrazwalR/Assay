@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
-
 import {FullMath} from "v4-core/libraries/FullMath.sol";
-
-import {IAssayErrors} from "../interfaces/IAssayErrors.sol";
 
 /// @notice Q32.32 fixed-point arithmetic: a real number `r` is stored as `r * 2**32`.
 /// @dev Q64.64 is the conventional choice but needs 128 bits, which does not fit the packed
@@ -48,17 +45,6 @@ library Q32x32 {
             // the nearest integer, and both bounds are themselves integers.
             // forge-lint: disable-next-line(unsafe-typecast)
             return int64(weighted / int256(uint256(ONE)));
-        }
-    }
-
-    /// @dev Converts an integer to Q32.32, reverting rather than truncating on overflow.
-    function fromUint(uint256 value) internal pure returns (uint64) {
-        if (value > type(uint32).max) revert IAssayErrors.AssayHook__FixedPointOverflow(value);
-        unchecked {
-            // The guard above has established value <= type(uint32).max, so the cast is
-            // lossless and the shift stays inside uint64.
-            // forge-lint: disable-next-line(unsafe-typecast)
-            return uint64(value) << 32;
         }
     }
 

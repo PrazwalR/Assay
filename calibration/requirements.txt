@@ -1,7 +1,10 @@
-numpy
-pandas
-pyarrow
-scikit-learn
-statsmodels
-requests
-pytest
+# requirements.lock is authoritative and is what CI installs; these bounds exist so a
+# developer resolving this file gets the same major versions the lock pins.
+numpy~=2.5
+pandas~=3.0
+pyarrow~=25.0
+scikit-learn~=1.9
+scipy~=1.18
+statsmodels~=0.14
+requests~=2.34
+pytest~=9.1

@@ -35,20 +35,15 @@ abstract contract AssayTestBase is Test {
 
     int24 internal constant TICK_SPACING = 60;
 
-    // Test fixtures, not calibrated values. lambda = 0.94 gives a ~17 block lookback for
-    // variance; the order-flow decay is a 50-swap half-life, matching the Python pipeline's
-    // default. Real deployments must supply values produced by the calibration milestone.
-    uint64 internal constant VARIANCE_LAMBDA_X32 = 4_037_269_258;
-    uint64 internal constant OFI_LAMBDA_X32 = 4_235_837_212;
-    int24 internal constant MAX_TICK_DELTA = 1000;
-
     /// @dev Both test tokens use 18 decimals and the mock feed uses 8, so the decimal
     ///      scaling is 10 ** (18 - 18 + 8). See ChainlinkReferenceAdapter.PRICE_NUMERATOR.
     uint256 internal constant PRICE_NUMERATOR = 1e8;
     uint256 internal constant ORACLE_MAX_AGE = 3600;
 
-    /// @dev Charge half the drift a swap captures. A test fixture, not a calibrated value.
-    uint24 internal constant CAPTURE_SHARE_BPS = 5000;
+    /// @dev Matches the calibrated value shipped in .env.example, so the suite exercises the
+    ///      configuration that actually deploys. `test_Quote_AtAHigherCaptureShare` covers a
+    ///      second point so the mechanism is not only tested at one setting.
+    uint24 internal constant CAPTURE_SHARE_BPS = 1000;
 
     PoolManager internal manager;
     AssayHook internal hook;
@@ -88,9 +83,6 @@ abstract contract AssayTestBase is Test {
             baseFeePips: BASE_FEE_PIPS,
             minFeePips: MIN_FEE_PIPS,
             maxFeePips: MAX_FEE_PIPS,
-            varianceLambdaX32: VARIANCE_LAMBDA_X32,
-            ofiLambdaX32: OFI_LAMBDA_X32,
-            maxTickDeltaPerBlock: MAX_TICK_DELTA,
             captureShareBps: CAPTURE_SHARE_BPS,
             referenceOracle: address(oracle)
         });

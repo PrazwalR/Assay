@@ -21,22 +21,23 @@ import {IAssayEvents} from "./interfaces/IAssayEvents.sol";
 import {IReferencePriceOracle} from "./interfaces/IReferencePriceOracle.sol";
 import {FeeBlend} from "./libraries/FeeBlend.sol";
 import {Mispricing} from "./libraries/Mispricing.sol";
-import {OrderFlowImbalance} from "./libraries/OrderFlowImbalance.sol";
 import {ToxicitySurcharge} from "./libraries/ToxicitySurcharge.sol";
-import {VarianceEwma} from "./libraries/VarianceEwma.sol";
 import {PoolState} from "./types/PoolState.sol";
 
 /// @title AssayHook
 /// @notice A Uniswap v4 hook that prices adverse selection per swap rather than per pool.
-/// @dev This contract performs no arithmetic. It reads state, delegates every formula to a
-///      pure library, writes state, and returns values. That separation is what makes the
-///      math independently fuzzable without a PoolManager.
+/// @dev Every formula lives in a pure library; this contract reads state, delegates, writes
+///      state and returns values. That separation is what makes the math independently
+///      fuzzable without a PoolManager. The only arithmetic here is the `|` that sets v4's
+///      fee-override flag and the `uint32(block.number)` narrowing used to detect a block
+///      boundary -- neither is a formula, and both are covered by the tests below.
 ///
 ///      The quoted fee is set from the drift a swap captures against a cached reference
-///      price. Realised variance and order-flow imbalance are maintained and published but
-///      do not yet enter the quote: measurement found they add nothing over the reference
-///      signal alone, and the growth-optimal curve that would consume variance needs
-///      parameters that have not been estimated from data.
+///      price. Realised variance and order-flow imbalance were previously maintained here
+///      and have been removed: calibration measured their incremental value over the
+///      reference signal at -0.008 and -0.002 across two windows, so they were paying gas on
+///      every swap to make the classifier no better. The libraries remain in the tree, pure
+///      and tested, for the milestone that can show they earn their cost.
 contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     using LPFeeLibrary for uint24;
     using StateLibrary for IPoolManager;
@@ -44,9 +45,6 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     uint24 private immutable BASE_FEE_PIPS;
     uint24 private immutable MIN_FEE_PIPS;
     uint24 private immutable MAX_FEE_PIPS;
-    uint64 private immutable VARIANCE_LAMBDA_X32;
-    uint64 private immutable OFI_LAMBDA_X32;
-    int24 private immutable MAX_TICK_DELTA_PER_BLOCK;
     uint24 private immutable CAPTURE_SHARE_BPS;
     IReferencePriceOracle private immutable REFERENCE_ORACLE;
 
@@ -63,17 +61,16 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         BASE_FEE_PIPS = config.baseFeePips;
         MIN_FEE_PIPS = config.minFeePips;
         MAX_FEE_PIPS = config.maxFeePips;
-        VARIANCE_LAMBDA_X32 = config.varianceLambdaX32;
-        OFI_LAMBDA_X32 = config.ofiLambdaX32;
-        MAX_TICK_DELTA_PER_BLOCK = config.maxTickDeltaPerBlock;
         CAPTURE_SHARE_BPS = config.captureShareBps;
         REFERENCE_ORACLE = IReferencePriceOracle(config.referenceOracle);
     }
 
     /// @notice The permissions this hook requires, and no others.
-    /// @dev `afterSwapReturnDelta` is claimed now although the surcharge that uses it lands in
-    ///      a later milestone. Permission bits are encoded in the hook address, so adding one
-    ///      later would change the address and invalidate every deployment and integration.
+    /// @dev `afterSwapReturnDelta` carries the toxicity surcharge: `_donateCeilingOverflow`
+    ///      returns a positive delta that repays the `donate` it just made. This is the only
+    ///      path where the hook touches swapper funds and is the first thing to review.
+    ///      Permission bits are encoded in the hook address, so a bit cannot be added later
+    ///      without changing the address and invalidating every recorded deployment.
     /// @return permissions The v4 permission set, corresponding to address mask 0x30C4.
     function getHookPermissions() public pure override returns (Hooks.Permissions memory permissions) {
         return Hooks.Permissions({
@@ -104,23 +101,10 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         return (BASE_FEE_PIPS, MIN_FEE_PIPS, MAX_FEE_PIPS);
     }
 
-    /// @notice The estimator parameters this hook was deployed with.
-    /// @dev Published so an integrator can reproduce the hook's state off chain, and so the
-    ///      deployed values can be checked against the calibration artifact that produced them.
-    /// @return varianceLambdaX32 Variance EWMA decay, Q32.32.
-    /// @return ofiLambdaX32 Order-flow EWMA decay, Q32.32.
-    /// @return maxTickDeltaPerBlock The per-block tick move beyond which samples are clamped.
-    function estimatorParameters()
-        external
-        view
-        returns (uint64 varianceLambdaX32, uint64 ofiLambdaX32, int24 maxTickDeltaPerBlock)
-    {
-        return (VARIANCE_LAMBDA_X32, OFI_LAMBDA_X32, MAX_TICK_DELTA_PER_BLOCK);
-    }
-
     /// @notice Current microstructure state for a pool.
     /// @param poolId The pool to read.
-    /// @return state Last observed tick and block, realised variance, and order-flow imbalance.
+    /// @return state Last observed tick, the cached reference tick and its freshness, and
+    ///         the block that reference was last refreshed in.
     function poolState(PoolId poolId) external view returns (PoolState memory state) {
         return _poolState[poolId];
     }
@@ -215,11 +199,8 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         (int24 referenceTick, bool referenceFresh) = _readReference();
         _poolState[poolId] = PoolState({
             lastTick: tick,
-            blockOpenTick: tick,
             referenceTick: referenceFresh ? referenceTick : tick,
             lastBlock: uint32(block.number),
-            varEwmaX32: 0,
-            ofiEwmaX32: 0,
             referenceFresh: referenceFresh
         });
 
@@ -251,13 +232,8 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
 
     /// @dev Folds this swap into the pool's microstructure state.
     ///
-    ///      Variance advances only on the first swap of a block. Sampling per swap would let
-    ///      an attacker move the price within one block, inflate the estimate, and so choose
-    ///      their own fee; sampling at block boundaries means the only observable is the
-    ///      block's net move, which costs real money to produce.
-    ///
-    ///      Order-flow imbalance advances on every swap, because its signal is the persistence
-    ///      of direction across individual orders rather than the net move.
+    ///      The reference is refreshed at most once per block; everything else here advances
+    ///      on every swap.
     function _afterSwap(
         address sender,
         PoolKey calldata key,
@@ -275,7 +251,7 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         int256 quotedDrift = Mispricing.signedTicks(state.referenceTick, state.lastTick, params.zeroForOne);
         bool quotedFresh = state.referenceFresh;
 
-        state = _advanceState(poolId, state, delta);
+        _advanceStateInPlace(poolId, state);
         _poolState[poolId] = state;
 
         emit SwapAssayed(
@@ -283,9 +259,7 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
             sender,
             FeeBlend.quote(
                 quotedDrift, quotedFresh, BASE_FEE_PIPS, MIN_FEE_PIPS, MAX_FEE_PIPS, CAPTURE_SHARE_BPS
-            ),
-            state.varEwmaX32,
-            state.ofiEwmaX32
+            )
         );
 
         return (
@@ -294,44 +268,29 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         );
     }
 
-    /// @dev Folds this swap into the pool's microstructure state and returns the updated
-    ///      value. Kept in its own frame so its locals do not compete for stack slots with
-    ///      the attribution and surcharge work that follows it.
-    function _advanceState(PoolId poolId, PoolState memory state, BalanceDelta delta)
-        private
-        returns (PoolState memory)
-    {
-        // Only the price and tick are needed; the protocol and LP fee fields of slot0 are
-        // deliberately discarded. One read serves both estimators, which is why slot0 is
-        // fetched rather than the tick alone.
+    /// @dev Advances the pool's cached state, MUTATING `state` in place.
+    ///
+    ///      `state` is a memory reference, so every assignment below is visible to the
+    ///      caller and there is no functional copy. Anything derived from the pre-swap
+    ///      state must be extracted BEFORE this is called -- see `quotedDrift` in
+    ///      `_afterSwap`. Taking a `PoolState memory` snapshot after this point aliases the
+    ///      mutated struct and silently yields post-swap values.
+    ///
+    ///      Kept in its own frame so its locals do not compete for stack slots with the
+    ///      attribution and surcharge work that follows.
+    function _advanceStateInPlace(PoolId poolId, PoolState memory state) private {
+        // slot0 also carries the price and both fee fields; only the tick is needed here and
+        // the rest are deliberately discarded.
         // slither-disable-next-line unused-return
-        (uint160 sqrtPriceX96, int24 tickNow,,) = poolManager.getSlot0(poolId);
+        (, int24 tickNow,,) = poolManager.getSlot0(poolId);
 
-        // A new block closes the previous observation period. The sample is that period's
-        // net move -- where it closed against where it opened -- not the move produced by
-        // whichever swap arrived first. Sampling against the first swap's own outcome lets an
-        // attacker inject one displacement twice; see the note on PoolState.
+        // The reference is refreshed at most once per block rather than on every swap. A
+        // live Chainlink read measures ~20,000 gas against the Base Sepolia aggregator, so
+        // the cost is amortised across a block's swaps -- but the first swap of each block
+        // still pays it in full, and that is the hook's most expensive path.
         if (state.lastBlock != uint32(block.number)) {
-            bool clamped;
-            (state.varEwmaX32, clamped) = VarianceEwma.update(
-                state.varEwmaX32,
-                state.lastTick,
-                state.blockOpenTick,
-                MAX_TICK_DELTA_PER_BLOCK,
-                VARIANCE_LAMBDA_X32
-            );
-            if (clamped) {
-                emit TickDeltaClamped(
-                    poolId, int256(state.lastTick) - int256(state.blockOpenTick), MAX_TICK_DELTA_PER_BLOCK
-                );
-            }
-            state.blockOpenTick = state.lastTick;
             state.lastBlock = uint32(block.number);
 
-            // Refreshed here, once per period, rather than on the quote path. A cold
-            // Chainlink read costs roughly 25,000 to 40,000 gas against a 40,000 gas budget
-            // for the hook's entire marginal cost, so reading it in beforeSwap would consume
-            // the budget on its own.
             (int24 referenceTick, bool referenceFresh) = _readReference();
             if (referenceFresh) {
                 state.referenceTick = referenceTick;
@@ -341,17 +300,8 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
                 emit ReferenceFreshnessChanged(poolId, referenceFresh);
             }
         }
+
         state.lastTick = tickNow;
-
-        uint128 liquidity = poolManager.getLiquidity(poolId);
-        state.ofiEwmaX32 = OrderFlowImbalance.update(
-            state.ofiEwmaX32,
-            delta.amount1(),
-            OrderFlowImbalance.virtualReserve(liquidity, sqrtPriceX96),
-            OFI_LAMBDA_X32
-        );
-
-        return state;
     }
 
     /// @dev Recovers the fee-cap overflow as a real token amount and routes it to in-range

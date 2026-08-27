@@ -18,7 +18,11 @@ jobs:
 
       - uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          # Pinned, not floating. foundry.toml requires the deployed bytecode to reproduce
+          # byte-for-byte from a checkout because the hook lives at a mined CREATE2 address;
+          # a moving compiler toolchain is at odds with that, and .gas-snapshot is only
+          # meaningful against the version that produced it.
+          version: v1.5.1
 
       - name: Format
         run: forge fmt --check
@@ -29,8 +33,23 @@ jobs:
       - name: Test
         run: forge test -vvv
 
+      # Gas tests are excluded: coverage instrumentation inflates gas, so their assertions
+      # measure the instrumented build rather than the shipped one. They gate in the test
+      # step instead.
       - name: Coverage
-        run: forge coverage --report summary --no-match-coverage "(script|test)"
+        run: |
+          forge coverage --report lcov --report-file lcov.info             --no-match-coverage "(script|test)" --no-match-path "test/gas/*"
+          python3 - <<'CHECK'
+          import re, sys
+          hit = found = 0
+          for line in open("lcov.info"):
+              if line.startswith("LH:"): hit += int(line[3:])
+              elif line.startswith("LF:"): found += int(line[3:])
+          pct = 100.0 * hit / found if found else 0.0
+          print(f"line coverage: {pct:.2f}% ({hit}/{found})")
+          if pct < 95.0:
+              sys.exit(f"coverage {pct:.2f}% is below the 95% floor")
+          CHECK
 
       # Fuzz and invariant gas is a function of run count and seed, and the ci profile runs
       # more fuzz iterations than the default one. Snapshotting them can never be stable, so
@@ -50,7 +69,11 @@ jobs:
 
       - uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          # Pinned, not floating. foundry.toml requires the deployed bytecode to reproduce
+          # byte-for-byte from a checkout because the hook lives at a mined CREATE2 address;
+          # a moving compiler toolchain is at odds with that, and .gas-snapshot is only
+          # meaningful against the version that produced it.
+          version: v1.5.1
 
       - uses: actions/setup-python@v5
         with:
@@ -58,8 +81,8 @@ jobs:
 
       - name: Slither
         run: |
-          pip install slither-analyzer
-          slither . --config-file slither.config.json
+          pip install slither-analyzer==0.11.6
+          slither . --config-file slither.config.json --fail-on medium
 
   secrets:
     runs-on: ubuntu-latest
@@ -85,6 +108,17 @@ jobs:
 
       - name: Install pinned dependencies
         run: uv venv .venv && uv pip install --python .venv/bin/python -r requirements.lock
+
+      # The Python computes the captureShareBps that gets deployed, so it is held to the
+      # same bar as the Solidity rather than only being run.
+      - name: Lint
+        run: uvx ruff check . --exclude .venv
+
+      - name: Format
+        run: uvx ruff format --check . --exclude .venv
+
+      - name: Dependency audit
+        run: uvx pip-audit -r requirements.lock --progress-spinner off
 
       - name: Tests
         run: .venv/bin/python -m pytest tests/ -q

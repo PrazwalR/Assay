@@ -34,13 +34,9 @@ from assay_calib.gate import (
 
 log = logging.getLogger("assay.gate")
 
-BLOCK_SECONDS = 12
-
 
 def _load_cached(data_dir: Path, tag: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    paths = {
-        name: data_dir / f"{name}_{tag}.parquet" for name in ("swaps", "blocks", "reference")
-    }
+    paths = {name: data_dir / f"{name}_{tag}.parquet" for name in ("swaps", "blocks", "reference")}
     missing = [p.name for p in paths.values() if not p.exists()]
     if missing:
         raise FileNotFoundError(
@@ -78,7 +74,7 @@ def _print_matrix(rows: list[dict], cfg: CalibrationConfig) -> None:
             f"{r['spearman']:>10.4f}{r['n_test']:>9,}"
         )
     print("-" * 92)
-    print(f"exploratory only -- the verdict below uses one pre-declared label, not this sweep")
+    print("exploratory only -- the verdict below uses one pre-declared label, not this sweep")
 
 
 def _print_coefficients(result: GateResult) -> None:
@@ -157,10 +153,14 @@ def _print_verdict(verdict: GateVerdict, cfg: CalibrationConfig) -> None:
     print(f"{'=' * 92}")
     labels = {
         "auc_above_gate": f"out-of-sample AUC >= {cfg.gate.min_auc}",
-        "beats_shuffled_control": f"margin over shuffled control >= {cfg.gate.min_permutation_margin}",
+        "beats_shuffled_control": (
+            f"margin over shuffled control >= {cfg.gate.min_permutation_margin}"
+        ),
         "every_fold_holds": f"weakest walk-forward fold >= {cfg.gate.min_fold_auc}",
         "enough_test_positives": f"test positives >= {cfg.gate.min_test_positives}",
-        "each_feature_points_as_theory_predicts": "every feature informative in the predicted direction",
+        "each_feature_points_as_theory_predicts": (
+            "every feature informative in the predicted direction"
+        ),
     }
     for name, ok in verdict.checks.items():
         print(f"  [{'PASS' if ok else 'FAIL'}]  {labels.get(name, name)}")

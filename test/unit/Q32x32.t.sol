@@ -3,7 +3,6 @@ pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 
-import {IAssayErrors} from "../../src/interfaces/IAssayErrors.sol";
 import {Q32x32} from "../../src/libraries/Q32x32.sol";
 
 contract Q32x32Test is Test {
@@ -62,19 +61,5 @@ contract Q32x32Test is Test {
 
     function test_Ratio_SaturatesWhenNumeratorExceedsDenominator() public pure {
         assertEq(Q32x32.ratio(5, 1), Q32x32.ONE);
-    }
-
-    function testFuzz_FromUint_RoundTripsBelowTheBound(uint32 value) public pure {
-        assertEq(Q32x32.fromUint(value) >> 32, value);
-    }
-
-    function test_RevertWhen_FromUintOverflows() public {
-        uint256 tooLarge = uint256(type(uint32).max) + 1;
-        vm.expectRevert(abi.encodeWithSelector(IAssayErrors.AssayHook__FixedPointOverflow.selector, tooLarge));
-        this.fromUintExternal(tooLarge);
-    }
-
-    function fromUintExternal(uint256 value) external pure returns (uint64) {
-        return Q32x32.fromUint(value);
     }
 }

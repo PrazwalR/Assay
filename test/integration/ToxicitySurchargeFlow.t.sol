@@ -42,10 +42,12 @@ contract ToxicitySurchargeFlowTest is AssayTestBase {
     }
 
     /// @dev Moves the reference far enough that the uncapped formula exceeds `maxFeePips`.
-    ///      A 5% quoted move is roughly 490 ticks; at a 50% capture share that asks for
-    ///      500 + 490*50 = 25,000 pips against a 10,000 ceiling.
+    ///      At the calibrated 1000 bps capture share the overflow threshold is drift > 950
+    ///      ticks, since 500 + drift*10 must exceed the 10,000 ceiling. A 20% quoted move is
+    ///      roughly 1,820 ticks, which clears it with margin after the warm-up swaps have
+    ///      moved the pool part-way back toward the reference.
     function _dislocateReference() internal {
-        feed.setAnswer(int256(105e6));
+        feed.setAnswer(int256(120e6));
         feed.setUpdatedAt(block.timestamp);
         vm.roll(block.number + 1);
         _swap(true, -0.0001 ether); // refreshes the cached reference

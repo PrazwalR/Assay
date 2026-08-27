@@ -67,7 +67,11 @@ class RpcClient:
                 sleep_for = self._spec.backoff_seconds * (2**attempt)
                 log.debug(
                     "rpc %s attempt %d/%d failed (%s); retrying in %.1fs",
-                    url, attempt + 1, self._spec.max_retries, exc, sleep_for,
+                    url,
+                    attempt + 1,
+                    self._spec.max_retries,
+                    exc,
+                    sleep_for,
                 )
                 time.sleep(sleep_for + random.random() * 0.5)
         raise RpcError(f"rpc failed after {self._spec.max_retries} attempts") from last_error

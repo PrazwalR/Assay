@@ -74,7 +74,9 @@ def decode_swap_log(entry: dict) -> dict:
     """Decode a Uniswap v3 Swap event into native Python integers."""
     data = entry["data"][2:]
     if len(data) != 5 * 64:
-        raise ValueError(f"unexpected Swap data length {len(data)} in tx {entry['transactionHash']}")
+        raise ValueError(
+            f"unexpected Swap data length {len(data)} in tx {entry['transactionHash']}"
+        )
     return {
         "block": int(entry["blockNumber"], 16),
         "log_index": int(entry["logIndex"], 16),
@@ -98,8 +100,14 @@ def verify_pool_orientation(client: RpcClient, pool: PoolSpec) -> None:
     Getting it backwards silently inverts every price and every label, so it is checked
     against the deployed contract rather than assumed.
     """
-    token0 = "0x" + client.call("eth_call", [{"to": pool.address, "data": _SELECTOR_TOKEN0}, "latest"])[-40:]
-    token1 = "0x" + client.call("eth_call", [{"to": pool.address, "data": _SELECTOR_TOKEN1}, "latest"])[-40:]
+    token0 = (
+        "0x"
+        + client.call("eth_call", [{"to": pool.address, "data": _SELECTOR_TOKEN0}, "latest"])[-40:]
+    )
+    token1 = (
+        "0x"
+        + client.call("eth_call", [{"to": pool.address, "data": _SELECTOR_TOKEN1}, "latest"])[-40:]
+    )
     dec0 = int(client.call("eth_call", [{"to": token0, "data": _SELECTOR_DECIMALS}, "latest"]), 16)
     dec1 = int(client.call("eth_call", [{"to": token1, "data": _SELECTOR_DECIMALS}, "latest"]), 16)
     fee = int(client.call("eth_call", [{"to": pool.address, "data": _SELECTOR_FEE}, "latest"]), 16)
@@ -113,11 +121,17 @@ def verify_pool_orientation(client: RpcClient, pool: PoolSpec) -> None:
         raise RpcError(f"fee mismatch: chain says {fee}, config says {pool.fee_pips}")
     log.info(
         "pool verified: token0=%s (%d dec), token1=%s (%d dec), fee=%d pips",
-        token0, dec0, token1, dec1, fee,
+        token0,
+        dec0,
+        token1,
+        dec1,
+        fee,
     )
 
 
-def fetch_swaps(client: RpcClient, cfg: CalibrationConfig, from_block: int, to_block: int) -> pd.DataFrame:
+def fetch_swaps(
+    client: RpcClient, cfg: CalibrationConfig, from_block: int, to_block: int
+) -> pd.DataFrame:
     """Pull every Swap event in [from_block, to_block], verifying against truncation."""
     rows: list[dict] = []
     chunk = cfg.rpc.log_chunk_blocks
@@ -145,9 +159,7 @@ def fetch_block_times(client: RpcClient, blocks: list[int]) -> pd.DataFrame:
     """Fetch timestamp and base fee for each block, batched."""
     unique = sorted(set(blocks))
     log.info("fetching timestamps for %d distinct blocks", len(unique))
-    results = client.concurrent_call(
-        "eth_getBlockByNumber", [[hex(b), False] for b in unique]
-    )
+    results = client.concurrent_call("eth_getBlockByNumber", [[hex(b), False] for b in unique])
     rows = []
     for block, res in zip(unique, results, strict=True):
         if res is None:
