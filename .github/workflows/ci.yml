@@ -33,6 +33,12 @@ jobs:
       - name: Test
         run: forge test -vvv
 
+      # Invariants run separately from the unit suite: they are slower, and a failure here
+      # means a property broke across a sequence rather than in a single case, which is worth
+      # seeing as its own line in the log.
+      - name: Invariants
+        run: forge test --match-path "test/invariant/*" -vv
+
       # Gas tests are excluded: coverage instrumentation inflates gas, so their assertions
       # measure the instrumented build rather than the shipped one. They gate in the test
       # step instead.

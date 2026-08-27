@@ -84,6 +84,23 @@ ever described the cheapest one.
 A live Chainlink read measures 20,774 gas against the Base Sepolia aggregator, which is why
 the reference is cached and refreshed at most once per block rather than read per swap.
 
+## Tests
+
+```
+forge test                            156 tests
+forge test --match-path "test/invariant/*"   7 stateful properties, 8,192 calls each
+```
+
+Unit tests assert what happens in orderings someone thought to write down. The invariant
+suite fuzzes the *ordering itself* — swaps, liquidity changes, block advances and reference
+price events in any sequence — and asserts properties that must hold after all of them:
+quoted fees stay inside the bounds `feeBounds()` advertises, the hook never accumulates a
+token balance, no delta is left unsettled, and liquidity can always be withdrawn.
+
+It runs with `fail_on_revert = true`, so a revert anywhere in a sequence aborts the run
+rather than being absorbed. Four of the five real bugs found in this project came from state
+interactions across calls, which is what this reaches and a fixed test sequence does not.
+
 ## Build
 
 ```bash
