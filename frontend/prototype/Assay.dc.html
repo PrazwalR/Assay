@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#0A0B0C;color:#E7EAEC;font-family:Archivo,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  *{box-sizing:border-box}
+  a{color:#4FC3E8;text-decoration:none}
+  a:hover{color:#8AD9F2}
+  button{font-family:inherit}
+  input{font-family:inherit}
+  ::selection{background:rgba(79,195,232,.25)}
+  @keyframes assayPulse{0%,100%{opacity:.35}50%{opacity:1}}
+  @keyframes assayShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+  @keyframes assaySpin{to{transform:rotate(360deg)}}
+  @keyframes assayRise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @keyframes assayRipple{from{transform:scale(.6);opacity:.55}to{transform:scale(2.4);opacity:0}}
+  @keyframes assayFlow{0%{stroke-dashoffset:240}100%{stroke-dashoffset:0}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#0A0B0C">
+
+  <sc-if value="{{ loudBanner }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 20px;background:#15100A;border-bottom:1px solid rgba(233,165,68,.22);font:500 11.5px/1.4 Archivo,sans-serif;color:#E9A544;text-align:center">
+    <span style="display:flex;align-items:center;gap:8px">
+      <span style="width:5px;height:5px;border-radius:50%;background:#E9A544;flex:none;animation:assayPulse 2.4s ease-in-out infinite"></span>
+      <span>Unaudited. Base Sepolia only. Never having held value.</span>
+    </span>
+    <span style="color:#B9915A">The adverse-selection gate does not currently pass — the mechanism is deployed, the evidence is not established. <a href="#gate" style="color:#E9A544;text-decoration:underline;text-underline-offset:2px">Read the result</a></span>
+  </div>
+  </sc-if>
+  <sc-if value="{{ quietBanner }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 20px;background:#0C0D0E;border-bottom:1px solid rgba(233,236,239,.06);font:400 11px/1.4 'JetBrains Mono',monospace;color:#6B7278;flex-wrap:wrap;text-align:center">
+    <span style="width:4px;height:4px;border-radius:50%;background:#E9A544;flex:none"></span>
+    <span>unaudited · base sepolia · gate not passing</span>
+    <a href="#gate" style="color:#6B7278;text-decoration:underline;text-underline-offset:2px">details</a>
+  </div>
+  </sc-if>
+
+  <header style="position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:24px;padding:0 24px;height:60px;background:rgba(10,11,12,.86);backdrop-filter:blur(14px);border-bottom:1px solid rgba(233,236,239,.07)">
+    <button onClick="{{ goHome }}" style="display:flex;align-items:center;gap:9px;background:none;border:0;padding:0;cursor:pointer;color:#E7EAEC">
+      <img src="assets/assay-mark-light.svg" alt="" style="width:22px;height:22px;display:block">
+      <span style="font:600 15px/1 Archivo,sans-serif;letter-spacing:-.01em">Assay</span>
+    </button>
+
+    <nav style="display:flex;align-items:center;gap:2px;margin-left:8px">
+      <button onClick="{{ goHome }}" style="background:none;border:0;padding:7px 11px;border-radius:7px;cursor:pointer;font:500 13.5px/1 Archivo,sans-serif;color:{{ navHome }}" style-hover="background:rgba(233,236,239,.05)">Overview</button>
+      <button onClick="{{ goSwap }}" style="background:none;border:0;padding:7px 11px;border-radius:7px;cursor:pointer;font:500 13.5px/1 Archivo,sans-serif;color:{{ navSwap }}" style-hover="background:rgba(233,236,239,.05)">Swap</button>
+      <button onClick="{{ goMarkets }}" style="background:none;border:0;padding:7px 11px;border-radius:7px;cursor:pointer;font:500 13.5px/1 Archivo,sans-serif;color:{{ navMarkets }}" style-hover="background:rgba(233,236,239,.05)">Markets</button>
+      <button onClick="{{ goDocs }}" style="background:none;border:0;padding:7px 11px;border-radius:7px;cursor:pointer;font:500 13.5px/1 Archivo,sans-serif;color:{{ navDocs }}" style-hover="background:rgba(233,236,239,.05)">Docs</button>
+    </nav>
+
+    <div style="flex:1"></div>
+
+    <button onClick="{{ toggleDataMode }}" title="Switch data source" style="display:flex;align-items:center;gap:7px;height:34px;padding:0 11px;border-radius:8px;background:#101214;border:1px solid rgba(233,236,239,.09);cursor:pointer;font:500 12px/1 'JetBrains Mono',monospace;color:#9BA1A6;white-space:nowrap;flex:none" style-hover="border-color:rgba(233,236,239,.2);color:#E7EAEC">
+      <span style="width:6px;height:6px;border-radius:50%;background:{{ modeDot }};flex:none"></span>
+      <span>{{ modeLabel }}</span>
+    </button>
+
+    <button onClick="{{ openNetworks }}" style="display:flex;align-items:center;gap:8px;height:34px;padding:0 11px;border-radius:8px;background:#101214;border:1px solid rgba(233,236,239,.09);cursor:pointer;font:500 12.5px/1 Archivo,sans-serif;color:#E7EAEC;white-space:nowrap;flex:none" style-hover="border-color:rgba(233,236,239,.2)">
+      <span style="width:15px;height:15px;border-radius:4px;background:{{ netColor }};flex:none"></span>
+      <span>{{ netName }}</span>
+      <span style="color:#6B7278;font-size:9px">▾</span>
+    </button>
+
+    <sc-if value="{{ connected }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ openWallet }}" style="display:flex;align-items:center;gap:10px;height:34px;padding:0 6px 0 12px;border-radius:8px;background:#101214;border:1px solid rgba(233,236,239,.09);cursor:pointer;color:#E7EAEC" style-hover="border-color:rgba(233,236,239,.2)">
+        <span style="font:500 12.5px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">{{ addrShort }}</span>
+        <span style="display:flex;align-items:center;height:24px;padding:0 8px;border-radius:5px;background:#191C1E;font:500 11.5px/1 'JetBrains Mono',monospace;color:#9BA1A6">{{ walletValue }}</span>
+      </button>
+    </sc-if>
+    <sc-if value="{{ disconnected }}" hint-placeholder-val="{{ true }}">
+      <button onClick="{{ openWallet }}" style="height:34px;padding:0 14px;border-radius:8px;background:#E7EAEC;border:0;cursor:pointer;font:600 12.5px/1 Archivo,sans-serif;color:#0A0B0C;transition:transform .16s ease,box-shadow .16s ease" style-hover="box-shadow:0 4px 16px rgba(231,234,236,.16);transform:translateY(-1px)">Connect wallet</button>
+    </sc-if>
+  </header>
+
+  <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+  <main>
+
+    <section style="max-width:1240px;margin:0 auto;padding:76px 24px 0">
+      <div style="display:inline-flex;align-items:center;gap:8px;padding:5px 11px 5px 8px;border-radius:20px;background:#101214;border:1px solid rgba(233,236,239,.08);font:500 11.5px/1 'JetBrains Mono',monospace;color:#9BA1A6;margin-bottom:28px">
+        <span style="width:5px;height:5px;border-radius:50%;background:#4FC3E8"></span>
+        Uniswap v4 hook · permission mask 0x30C4
+      </div>
+
+      <h1 style="margin:0 0 22px;font:600 clamp(38px,5.4vw,74px)/1.03 Archivo,sans-serif;letter-spacing:-.035em;max-width:16em;text-wrap:balance">Volatility is the same for everyone in a block. Adverse selection is not.</h1>
+
+      <p style="margin:0 0 36px;max-width:60ch;font:400 17px/1.6 Archivo,sans-serif;color:#9BA1A6;text-wrap:pretty">Every dynamic-fee hook shipping today sets the fee from volatility — so a retail swap and a top-of-block arbitrage pay the same rate, though one is the liquidity provider's entire revenue and the other is their entire loss. Assay prices each swap on the drift it captures against a cached reference, signed by direction.</p>
+
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:64px">
+        <button onClick="{{ goSwap }}" style="height:44px;padding:0 20px;border-radius:9px;background:#E7EAEC;border:0;cursor:pointer;font:600 14px/1 Archivo,sans-serif;color:#0A0B0C;transition:transform .16s ease,box-shadow .16s ease" style-hover="box-shadow:0 6px 22px rgba(231,234,236,.16);transform:translateY(-1px)">Open the exchange</button>
+        <button onClick="{{ goDocs }}" style="height:44px;padding:0 20px;border-radius:9px;background:#101214;border:1px solid rgba(233,236,239,.11);cursor:pointer;font:600 14px/1 Archivo,sans-serif;color:#E7EAEC" style-hover="border-color:rgba(233,236,239,.24)">Read the mechanism</button>
+      </div>
+    </section>
+
+    <section style="max-width:1240px;margin:0 auto;padding:0 24px 84px">
+      <div style="background:#0E1011;border:1px solid rgba(233,236,239,.08);border-radius:16px;overflow:hidden">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:20px;padding:20px 24px 16px;flex-wrap:wrap">
+          <div>
+            <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#6B7278;margin-bottom:9px">The quote surface</div>
+            <div style="font:500 15px/1.45 Archivo,sans-serif;color:#E7EAEC;max-width:52ch">Fee as a function of signed drift. Two swaps in one block, against the same drift, in opposite directions.</div>
+          </div>
+          <div style="display:flex;gap:28px">
+            <div>
+              <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:7px">Capturing</div>
+              <div style="font:600 24px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:{{ toneColor }}">{{ feeBpText }}</div>
+            </div>
+            <div>
+              <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:7px">Opposing</div>
+              <div style="font:600 24px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#5BD08C">{{ twinBpText }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div onPointerDown="{{ curveDown }}" style="position:relative;height:340px;cursor:ew-resize;touch-action:none;border-top:1px solid rgba(233,236,239,.06)">
+          <svg viewBox="0 0 1000 340" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;display:block">
+            <line x1="0" y1="60" x2="1000" y2="60" stroke="rgba(233,236,239,.055)" stroke-width="1"></line>
+            <line x1="0" y1="130" x2="1000" y2="130" stroke="rgba(233,236,239,.055)" stroke-width="1"></line>
+            <line x1="0" y1="200" x2="1000" y2="200" stroke="rgba(233,236,239,.055)" stroke-width="1"></line>
+            <line x1="0" y1="270" x2="1000" y2="270" stroke="rgba(233,236,239,.055)" stroke-width="1"></line>
+            <line x1="142.8" y1="0" x2="142.8" y2="340" stroke="rgba(233,236,239,.11)" stroke-width="1" stroke-dasharray="3 4"></line>
+            <polyline points="0,320 114,320 821,29 1000,29" fill="none" stroke="rgba(233,236,239,.16)" stroke-width="6" stroke-linejoin="round"></polyline>
+            <polyline points="0,320 114,320 821,29 1000,29" fill="none" stroke="#4FC3E8" stroke-width="1.75" stroke-linejoin="round" stroke-dasharray="240" style="animation:assayFlow 2.2s ease-out"></polyline>
+            <line x1="{{ twinX }}" y1="0" x2="{{ twinX }}" y2="340" stroke="rgba(91,208,140,.22)" stroke-width="1"></line>
+            <circle cx="{{ twinX }}" cy="{{ twinY }}" r="5" fill="#0A0B0C" stroke="#5BD08C" stroke-width="2"></circle>
+            <line x1="{{ markX }}" y1="0" x2="{{ markX }}" y2="340" stroke="rgba(233,236,239,.16)" stroke-width="1"></line>
+            <circle cx="{{ markX }}" cy="{{ markY }}" r="11" fill="{{ toneColor }}" opacity=".18" style="animation:assayRipple 1.8s ease-out infinite"></circle>
+            <circle cx="{{ markX }}" cy="{{ markY }}" r="5.5" fill="{{ toneColor }}"></circle>
+          </svg>
+
+          <div style="position:absolute;left:14px;top:12px;font:500 10.5px/1 'JetBrains Mono',monospace;color:#6B7278">1.00% ceiling — maxFeePips 10,000</div>
+          <div style="position:absolute;left:14px;bottom:12px;font:500 10.5px/1 'JetBrains Mono',monospace;color:#6B7278">0.01% floor — minFeePips 100</div>
+          <div style="position:absolute;left:150px;bottom:52px;font:500 10.5px/1 'JetBrains Mono',monospace;color:#9BA1A6">drift = 0 · base 0.05%</div>
+          <div style="position:absolute;right:14px;bottom:12px;font:500 10.5px/1 'JetBrains Mono',monospace;color:#6B7278">drift +1,200 ticks →</div>
+          <div style="position:absolute;left:{{ markPct }};top:18px;transform:translateX(-50%);pointer-events:none;padding:6px 9px;border-radius:7px;background:#15181A;border:1px solid rgba(233,236,239,.12);font:500 11.5px/1.5 'JetBrains Mono',monospace;color:#E7EAEC;white-space:nowrap;text-align:left">
+            <div style="color:#9BA1A6">drift {{ driftSigned }} ticks</div>
+            <div style="color:{{ toneColor }}">fee {{ feePipsText }} pips</div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;padding:14px 24px;border-top:1px solid rgba(233,236,239,.06);flex-wrap:wrap">
+          <span style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-right:4px">Scenario</span>
+          <button onClick="{{ preset0 }}" style="height:29px;padding:0 11px;border-radius:7px;background:#131617;border:1px solid rgba(233,236,239,.09);cursor:pointer;font:500 12px/1 Archivo,sans-serif;color:#9BA1A6" style-hover="color:#E7EAEC;border-color:rgba(233,236,239,.2)">At reference</button>
+          <button onClick="{{ preset1 }}" style="height:29px;padding:0 11px;border-radius:7px;background:#131617;border:1px solid rgba(233,236,239,.09);cursor:pointer;font:500 12px/1 Archivo,sans-serif;color:#9BA1A6" style-hover="color:#E7EAEC;border-color:rgba(233,236,239,.2)">Retail drift</button>
+          <button onClick="{{ preset2 }}" style="height:29px;padding:0 11px;border-radius:7px;background:#131617;border:1px solid rgba(233,236,239,.09);cursor:pointer;font:500 12px/1 Archivo,sans-serif;color:#9BA1A6" style-hover="color:#E7EAEC;border-color:rgba(233,236,239,.2)">Top-of-block arb</button>
+          <button onClick="{{ preset3 }}" style="height:29px;padding:0 11px;border-radius:7px;background:#131617;border:1px solid rgba(233,236,239,.09);cursor:pointer;font:500 12px/1 Archivo,sans-serif;color:#9BA1A6" style-hover="color:#E7EAEC;border-color:rgba(233,236,239,.2)">Extreme dislocation</button>
+          <div style="flex:1"></div>
+          <button onClick="{{ toggleLive }}" style="display:flex;align-items:center;gap:7px;height:29px;padding:0 11px;border-radius:7px;background:none;border:1px solid rgba(233,236,239,.09);cursor:pointer;font:500 12px/1 'JetBrains Mono',monospace;color:#9BA1A6" style-hover="color:#E7EAEC;border-color:rgba(233,236,239,.2)">
+            <span style="width:5px;height:5px;border-radius:50%;background:{{ liveDot }}"></span>{{ liveLabel }}
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section style="max-width:1240px;margin:0 auto;padding:0 24px 92px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:rgba(233,236,239,.07);border:1px solid rgba(233,236,239,.07);border-radius:14px;overflow:hidden">
+        <div style="background:#0E1011;padding:20px 22px">
+          <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:11px">Base fee</div>
+          <div style="font:500 27px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;margin-bottom:6px">0.05<span style="font-size:15px;color:#6B7278">%</span></div>
+          <div style="font:400 11.5px/1.4 'JetBrains Mono',monospace;color:#6B7278">500 pips</div>
+        </div>
+        <div style="background:#0E1011;padding:20px 22px">
+          <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:11px">Bounds</div>
+          <div style="font:500 27px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;margin-bottom:6px">0.01<span style="font-size:15px;color:#6B7278">–</span>1.00<span style="font-size:15px;color:#6B7278">%</span></div>
+          <div style="font:400 11.5px/1.4 'JetBrains Mono',monospace;color:#6B7278">100 – 10,000 pips</div>
+        </div>
+        <div style="background:#0E1011;padding:20px 22px">
+          <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:11px">Capture share</div>
+          <div style="font:500 27px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;margin-bottom:6px">10.00<span style="font-size:15px;color:#6B7278">%</span></div>
+          <div style="font:400 11.5px/1.4 'JetBrains Mono',monospace;color:#6B7278">1,000 bps · calibrated</div>
+        </div>
+        <div style="background:#0E1011;padding:20px 22px">
+          <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:11px">Swap-path gas</div>
+          <div style="font:500 27px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;margin-bottom:6px">14,572</div>
+          <div style="font:400 11.5px/1.4 'JetBrains Mono',monospace;color:#6B7278">budget 20,000</div>
+        </div>
+        <div style="background:#0E1011;padding:20px 22px">
+          <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:11px">Runtime</div>
+          <div style="font:500 27px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;margin-bottom:6px">9,625<span style="font-size:15px;color:#6B7278"> B</span></div>
+          <div style="font:400 11.5px/1.4 'JetBrains Mono',monospace;color:#6B7278">reproduces byte-for-byte</div>
+        </div>
+      </div>
+    </section>
+
+    <section style="max-width:1240px;margin:0 auto;padding:0 24px 96px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px">
+        <div style="background:#0E1011;border:1px solid rgba(233,236,239,.08);border-radius:14px;padding:24px">
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:16px">
+            <span style="font:600 11px/1 'JetBrains Mono',monospace;padding:4px 7px;border-radius:5px;background:rgba(79,195,232,.12);color:#4FC3E8">beforeSwap</span>
+            <span style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278">one storage slot</span>
+          </div>
+          <p style="margin:0 0 18px;font:400 14.5px/1.6 Archivo,sans-serif;color:#9BA1A6;text-wrap:pretty">Reads the packed slot, computes the signed tick distance between the pool and the cached reference, scales it by the capture share, clamps, and returns it with the v4 override flag. Total over its whole input domain — a revert here would brick the pool for everyone.</p>
+          <div style="font:400 12.5px/1.9 'JetBrains Mono',monospace;color:#9BA1A6;background:#0A0B0C;border:1px solid rgba(233,236,239,.06);border-radius:9px;padding:14px 16px;overflow-x:auto"><span style="color:#6B7278">fee =</span> clamp(<br>&nbsp;&nbsp;baseFeePips + ⌈drift · 100 · share / 10⁴⌉,<br>&nbsp;&nbsp;minFeePips, maxFeePips<br>)</div>
+        </div>
+        <div style="background:#0E1011;border:1px solid rgba(233,236,239,.08);border-radius:14px;padding:24px">
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:16px">
+            <span style="font:600 11px/1 'JetBrains Mono',monospace;padding:4px 7px;border-radius:5px;background:rgba(91,208,140,.12);color:#5BD08C">afterSwap</span>
+            <span style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278">returns delta</span>
+          </div>
+          <p style="margin:0 0 18px;font:400 14.5px/1.6 Archivo,sans-serif;color:#9BA1A6;text-wrap:pretty">Advances the cached tick and refreshes the reference at most once per block — a live Chainlink read costs 20,774 gas, which is why it is not read per swap. On extreme dislocation the fee-cap overflow is taken and donated to in-range liquidity.</p>
+          <div style="font:400 12.5px/1.9 'JetBrains Mono',monospace;color:#9BA1A6;background:#0A0B0C;border:1px solid rgba(233,236,239,.06);border-radius:9px;padding:14px 16px;overflow-x:auto"><span style="color:#6B7278">if</span> raw &gt; maxFeePips:<br>&nbsp;&nbsp;donate(raw − maxFeePips) → in-range LPs<br><span style="color:#6B7278">// no escrow, no owner, no custody</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section style="max-width:1240px;margin:0 auto;padding:0 24px 96px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:44px 56px;align-items:start">
+        <div>
+          <h2 style="margin:0 0 14px;font:600 30px/1.15 Archivo,sans-serif;letter-spacing:-.025em">Spoofing resistance is economic, not architectural.</h2>
+          <p style="margin:0;font:400 15.5px/1.65 Archivo,sans-serif;color:#9BA1A6;text-wrap:pretty">The fee is quoted from a quantity the trader must pay to fake. Trading away from the reference to earn the low quote means forgoing the drift itself. Flow that captures nothing has negative drift and is quoted <em style="color:#5BD08C;font-style:normal">below</em> the base fee — that sign is the entire per-swap discrimination.</p>
+        </div>
+        <div style="display:grid;gap:1px;background:rgba(233,236,239,.07);border:1px solid rgba(233,236,239,.07);border-radius:12px;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;background:#0E1011;padding:15px 18px">
+            <span style="font:400 13.5px/1.4 Archivo,sans-serif;color:#9BA1A6">Never reverts on toxic flow</span>
+            <span style="font:500 11.5px/1 'JetBrains Mono',monospace;color:#5BD08C;flex:none">prices, never blocks</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;background:#0E1011;padding:15px 18px">
+            <span style="font:400 13.5px/1.4 Archivo,sans-serif;color:#9BA1A6">No custody of swap principal</span>
+            <span style="font:500 11.5px/1 'JetBrains Mono',monospace;color:#5BD08C;flex:none">structural</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;background:#0E1011;padding:15px 18px">
+            <span style="font:400 13.5px/1.4 Archivo,sans-serif;color:#9BA1A6">Stale reference degrades to the ceiling</span>
+            <span style="font:500 11.5px/1 'JetBrains Mono',monospace;color:#E9A544;flex:none">does not revert</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;background:#0E1011;padding:15px 18px">
+            <span style="font:400 13.5px/1.4 Archivo,sans-serif;color:#9BA1A6">Configuration immutable, no governance</span>
+            <span style="font:500 11.5px/1 'JetBrains Mono',monospace;color:#9BA1A6;flex:none">no admin key</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;background:#0E1011;padding:15px 18px">
+            <span style="font:400 13.5px/1.4 Archivo,sans-serif;color:#9BA1A6">No pause, no upgradeability</span>
+            <span style="font:500 11.5px/1 'JetBrains Mono',monospace;color:#9BA1A6;flex:none">deliberate</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="gate" style="max-width:1240px;margin:0 auto;padding:0 24px 96px;scroll-margin-top:80px">
+      <div style="border:1px solid rgba(233,165,68,.2);background:#100E0A;border-radius:16px;padding:30px 32px">
+        <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#E9A544;margin-bottom:16px">What is not established</div>
+        <h2 style="margin:0 0 16px;font:600 26px/1.2 Archivo,sans-serif;letter-spacing:-.02em;max-width:26ch">The adverse-selection gate does not currently pass.</h2>
+        <p style="margin:0 0 26px;max-width:72ch;font:400 15px/1.65 Archivo,sans-serif;color:#9BA1A6;text-wrap:pretty">The mechanism works and is deployed. The evidence that it improves liquidity-provider outcomes is not established. Two subsystems were measured and removed rather than left to bill every swap for nothing, and one parameter is bounded rather than measured. This is stated here so silence is not mistaken for coverage.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1px;background:rgba(233,165,68,.14);border:1px solid rgba(233,165,68,.14);border-radius:11px;overflow:hidden">
+          <div style="background:#0E0D0A;padding:17px 19px">
+            <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:10px">Variance EWMA</div>
+            <div style="font:500 21px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#E4674F;margin-bottom:7px">−0.008</div>
+            <div style="font:400 12px/1.45 Archivo,sans-serif;color:#6B7278">Incremental value over the reference signal alone. Removed from the swap path.</div>
+          </div>
+          <div style="background:#0E0D0A;padding:17px 19px">
+            <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:10px">Order-flow imbalance</div>
+            <div style="font:500 21px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#E4674F;margin-bottom:7px">−0.002</div>
+            <div style="font:400 12px/1.45 Archivo,sans-serif;color:#6B7278">Same measurement, second window. Library retained, pure and tested.</div>
+          </div>
+          <div style="background:#0E0D0A;padding:17px 19px">
+            <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:10px">Worst case at 1,000 bps</div>
+            <div style="font:500 21px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#E9A544;margin-bottom:7px">−$935</div>
+            <div style="font:400 12px/1.45 Archivo,sans-serif;color:#6B7278">Over three days on $317M of volume. 5,000 bps was thirteen times worse.</div>
+          </div>
+          <div style="background:#0E0D0A;padding:17px 19px">
+            <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:10px">Not implemented</div>
+            <div style="font:500 21px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#E9A544;margin-bottom:7px">TWAP cap</div>
+            <div style="font:400 12px/1.45 Archivo,sans-serif;color:#6B7278">A compromised feed within its staleness window mis-prices, bounded only by maxFeePips.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="max-width:1240px;margin:0 auto;padding:0 24px 100px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:20px;margin-bottom:22px;flex-wrap:wrap">
+        <h2 style="margin:0;font:600 26px/1.2 Archivo,sans-serif;letter-spacing:-.02em">Measured, not asserted</h2>
+        <div style="font:400 13px/1.4 'JetBrains Mono',monospace;color:#6B7278">156 tests · 7 stateful properties × 8,192 calls · fail_on_revert</div>
+      </div>
+      <div style="border:1px solid rgba(233,236,239,.07);border-radius:13px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:2.2fr 1fr 1fr 1.4fr;gap:16px;padding:12px 20px;background:#0E1011;border-bottom:1px solid rgba(233,236,239,.07);font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278">
+          <div>Path</div><div style="text-align:right">Measured</div><div style="text-align:right">Budget</div><div style="text-align:right">Headroom</div>
+        </div>
+        <div style="display:grid;grid-template-columns:2.2fr 1fr 1fr 1.4fr;gap:16px;padding:15px 20px;background:#0A0B0C;border-bottom:1px solid rgba(233,236,239,.05);font:400 13.5px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">
+          <div style="font-family:Archivo,sans-serif;color:#E7EAEC">Ordinary swap</div><div style="text-align:right">14,572</div><div style="text-align:right;color:#6B7278">20,000</div><div style="text-align:right;color:#5BD08C">27% under</div>
+        </div>
+        <div style="display:grid;grid-template-columns:2.2fr 1fr 1fr 1.4fr;gap:16px;padding:15px 20px;background:#0A0B0C;border-bottom:1px solid rgba(233,236,239,.05);font:400 13.5px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">
+          <div style="font-family:Archivo,sans-serif;color:#E7EAEC">Block boundary — reference refresh</div><div style="text-align:right">30,901<span style="color:#6B7278"> +16.5k</span></div><div style="text-align:right;color:#6B7278">55,000</div><div style="text-align:right;color:#5BD08C">14% under</div>
+        </div>
+        <div style="display:grid;grid-template-columns:2.2fr 1fr 1fr 1.4fr;gap:16px;padding:15px 20px;background:#0A0B0C;font:400 13.5px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">
+          <div style="font-family:Archivo,sans-serif;color:#E7EAEC">Extreme dislocation — surcharge</div><div style="text-align:right">48,582</div><div style="text-align:right;color:#6B7278">55,000</div><div style="text-align:right;color:#5BD08C">12% under</div>
+        </div>
+      </div>
+      <p style="margin:16px 0 0;font:400 13px/1.6 Archivo,sans-serif;color:#6B7278;max-width:78ch">Three reachable paths, budgeted and measured separately, because a single number only ever described the cheapest one. Four of the five real bugs in this project came from state interactions across calls — which is what the invariant suite reaches and a fixed test sequence does not.</p>
+    </section>
+
+    <section style="max-width:1240px;margin:0 auto;padding:0 24px 110px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:28px;background:#0E1011;border:1px solid rgba(233,236,239,.08);border-radius:16px;padding:34px 36px;flex-wrap:wrap">
+        <div>
+          <h2 style="margin:0 0 9px;font:600 25px/1.2 Archivo,sans-serif;letter-spacing:-.02em">Read the mechanism, then read what it does not prove.</h2>
+          <p style="margin:0;font:400 14.5px/1.55 Archivo,sans-serif;color:#9BA1A6;max-width:56ch">The full derivation, the v4 constraints that shape the code, the invariants, and the threat model — with the mitigations that are not implemented named as such.</p>
+        </div>
+        <div style="display:flex;gap:11px">
+          <button onClick="{{ goDocs }}" style="height:42px;padding:0 19px;border-radius:9px;background:#E7EAEC;border:0;cursor:pointer;font:600 13.5px/1 Archivo,sans-serif;color:#0A0B0C">Documentation</button>
+          <button onClick="{{ goMarkets }}" style="height:42px;padding:0 19px;border-radius:9px;background:#151819;border:1px solid rgba(233,236,239,.11);cursor:pointer;font:600 13.5px/1 Archivo,sans-serif;color:#E7EAEC" style-hover="border-color:rgba(233,236,239,.24)">Live markets</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+  </sc-if>
+
+  <sc-if value="{{ isSwap }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width:1240px;margin:0 auto;padding:36px 24px 90px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:24px;align-items:start">
+
+      <div style="background:#0E1011;border:1px solid rgba(233,236,239,.09);border-radius:18px;padding:18px;box-shadow:0 24px 60px -30px rgba(0,0,0,.9);max-width:460px;width:100%;justify-self:start">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding:0 2px">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font:600 17px/1 Archivo,sans-serif;letter-spacing:-.01em">Swap</span>
+            <span style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278">block {{ blockNum }}</span>
+          </div>
+          <button onClick="{{ openSettings }}" title="Slippage and deadline" style="width:30px;height:30px;border-radius:8px;background:#151819;border:1px solid rgba(233,236,239,.08);cursor:pointer;color:#9BA1A6;font:400 13px/1 'JetBrains Mono',monospace" style-hover="color:#E7EAEC;border-color:rgba(233,236,239,.2)">⚙</button>
+        </div>
+
+        <div style="background:#131617;border:1px solid rgba(233,236,239,.06);border-radius:14px;padding:15px 16px 13px;transition:border-color .18s ease" style-focus-within="border-color:rgba(79,195,232,.4)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+            <span style="font:500 11.5px/1 Archivo,sans-serif;color:#6B7278">You pay</span>
+            <span style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278">Balance {{ inBalance }}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <input value="{{ amountIn }}" onChange="{{ onAmountIn }}" inputMode="decimal" placeholder="0.00" aria-label="Amount to pay" style="flex:1;min-width:0;background:none;border:0;outline:none;color:#E7EAEC;font:500 30px/1.1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;padding:0">
+            <button onClick="{{ openTokenIn }}" style="display:flex;align-items:center;gap:8px;height:38px;padding:0 10px 0 7px;border-radius:19px;background:#191C1E;border:1px solid rgba(233,236,239,.08);cursor:pointer;color:#E7EAEC;flex:none;transition:transform .16s ease" style-hover="border-color:rgba(233,236,239,.22);transform:scale(1.03)">
+              <span style="width:24px;height:24px;border-radius:50%;background:{{ inTokenColor }};display:flex;align-items:center;justify-content:center;font:600 9.5px/1 'JetBrains Mono',monospace;color:#0A0B0C">{{ inTokenGlyph }}</span>
+              <span style="font:600 14px/1 Archivo,sans-serif">{{ inTokenSymbol }}</span>
+              <span style="color:#6B7278;font-size:9px">▾</span>
+            </button>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:9px">
+            <span style="font:400 12px/1 'JetBrains Mono',monospace;color:#6B7278">{{ amountInUsd }}</span>
+            <div style="display:flex;gap:5px">
+              <button onClick="{{ setHalf }}" style="height:22px;padding:0 8px;border-radius:5px;background:#191C1E;border:0;cursor:pointer;font:500 10.5px/1 'JetBrains Mono',monospace;color:#9BA1A6" style-hover="color:#E7EAEC">50%</button>
+              <button onClick="{{ setMax }}" style="height:22px;padding:0 8px;border-radius:5px;background:#191C1E;border:0;cursor:pointer;font:500 10.5px/1 'JetBrains Mono',monospace;color:#9BA1A6" style-hover="color:#E7EAEC">MAX</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;margin:-9px 0;position:relative;z-index:2;padding:0 4px">
+          <div style="flex:1;height:1px;background:rgba(233,236,239,.06)"></div>
+          <button onClick="{{ flipDirection }}" aria-label="Reverse direction" style="width:34px;height:34px;border-radius:11px;background:#191C1E;border:1px solid rgba(233,236,239,.1);cursor:pointer;color:#E7EAEC;font:400 14px/1 'JetBrains Mono',monospace;display:flex;align-items:center;justify-content:center;transition:transform .28s cubic-bezier(.34,1.56,.64,1),background .18s ease,border-color .18s ease" style-hover="background:#4FC3E8;color:#0A0B0C;border-color:#4FC3E8;transform:rotate(180deg) scale(1.08)">↓</button>
+          <div style="flex:1;height:1px;background:rgba(233,236,239,.06)"></div>
+        </div>
+
+        <div style="background:#131617;border:1px solid rgba(233,236,239,.06);border-radius:14px;padding:15px 16px 13px;margin-top:9px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+            <span style="font:500 11.5px/1 Archivo,sans-serif;color:#6B7278">You receive</span>
+            <span style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278">Balance {{ outBalance }}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="flex:1;min-width:0;font:500 30px/1.1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:{{ outColor }};overflow:hidden;text-overflow:ellipsis">{{ amountOut }}</div>
+            <button onClick="{{ openTokenOut }}" style="display:flex;align-items:center;gap:8px;height:38px;padding:0 10px 0 7px;border-radius:19px;background:#191C1E;border:1px solid rgba(233,236,239,.08);cursor:pointer;color:#E7EAEC;flex:none;transition:transform .16s ease" style-hover="border-color:rgba(233,236,239,.22);transform:scale(1.03)">
+              <span style="width:24px;height:24px;border-radius:50%;background:{{ outTokenColor }};display:flex;align-items:center;justify-content:center;font:600 9.5px/1 'JetBrains Mono',monospace;color:#0A0B0C">{{ outTokenGlyph }}</span>
+              <span style="font:600 14px/1 Archivo,sans-serif">{{ outTokenSymbol }}</span>
+              <span style="color:#6B7278;font-size:9px">▾</span>
+            </button>
+          </div>
+          <div style="margin-top:9px;font:400 12px/1 'JetBrains Mono',monospace;color:#6B7278">{{ amountOutUsd }}</div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:13px;padding:11px 14px;border-radius:11px;background:{{ toneWash }};border:1px solid {{ toneBorder }}">
+          <div style="display:flex;align-items:center;gap:9px;min-width:0">
+            <span style="width:6px;height:6px;border-radius:50%;background:{{ toneColor }};flex:none"></span>
+            <span style="font:500 12.5px/1.35 Archivo,sans-serif;color:{{ toneColor }}">{{ toneLabel }}</span>
+          </div>
+          <span style="font:600 15px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:{{ toneColor }};flex:none">{{ feePctText }}</span>
+        </div>
+
+        <div style="display:grid;gap:1px;background:rgba(233,236,239,.06);border:1px solid rgba(233,236,239,.06);border-radius:11px;overflow:hidden;margin-top:11px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;background:#0E1011;padding:10px 14px">
+            <span style="font:400 12.5px/1 Archivo,sans-serif;color:#6B7278">Rate</span>
+            <span style="font:400 12.5px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#9BA1A6">{{ rateText }}</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;background:#0E1011;padding:10px 14px">
+            <span style="font:400 12.5px/1 Archivo,sans-serif;color:#6B7278">Minimum received</span>
+            <span style="font:400 12.5px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#9BA1A6">{{ minReceived }}</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;background:#0E1011;padding:10px 14px">
+            <span style="font:400 12.5px/1 Archivo,sans-serif;color:#6B7278">Network fee</span>
+            <span style="font:400 12.5px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#9BA1A6">{{ networkFee }}</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;background:#0E1011;padding:10px 14px">
+            <span style="font:400 12.5px/1 Archivo,sans-serif;color:#6B7278">Hook gas</span>
+            <span style="font:400 12.5px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#9BA1A6">{{ hookGas }}</span>
+          </div>
+        </div>
+
+        <sc-if value="{{ showError }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:12px;padding:13px 15px;border-radius:11px;background:#150E0C;border:1px solid rgba(228,103,79,.28);animation:assayRise .24s ease">
+            <div style="font:600 12.5px/1.3 Archivo,sans-serif;color:#E4674F;margin-bottom:5px">{{ errorTitle }}</div>
+            <div style="font:400 12.5px/1.5 Archivo,sans-serif;color:#9A8480">{{ errorBody }}</div>
+          </div>
+        </sc-if>
+
+        <button onClick="{{ submit }}" disabled="{{ ctaDisabled }}" style="width:100%;height:50px;margin-top:12px;border-radius:12px;border:0;cursor:{{ ctaCursor }};background:{{ ctaBg }};color:{{ ctaFg }};font:600 14.5px/1 Archivo,sans-serif;transition:transform .16s ease,box-shadow .16s ease" style-hover="transform:translateY(-1px)">{{ ctaLabel }}</button>
+
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;font:400 11px/1 'JetBrains Mono',monospace;color:#6B7278">
+          <span style="width:5px;height:5px;border-radius:50%;background:{{ freshDot }};animation:assayPulse 2.6s ease-in-out infinite"></span>
+          <span>{{ freshText }}</span>
+          <button onClick="{{ toggleFresh }}" style="background:none;border:0;padding:0;cursor:pointer;color:#4FC3E8;font:inherit;text-decoration:underline;text-underline-offset:2px">simulate</button>
+        </div>
+      </div>
+
+      <div style="display:grid;gap:16px">
+
+        <div style="background:#0E1011;border:1px solid rgba(233,236,239,.09);border-radius:16px;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px 14px">
+            <div>
+              <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#6B7278;margin-bottom:8px">Why this fee</div>
+              <div style="font:500 14.5px/1.4 Archivo,sans-serif;color:#E7EAEC">Signed drift against the cached reference</div>
+            </div>
+            <div style="text-align:right;flex:none">
+              <div style="font:600 30px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:{{ toneColor }}">{{ driftSigned }}</div>
+              <div style="font:400 11px/1 'JetBrains Mono',monospace;color:#6B7278;margin-top:6px">ticks · 1 tick = 1 bp</div>
+            </div>
+          </div>
+
+          <div onPointerDown="{{ meterDown }}" style="position:relative;height:52px;margin:0 20px 16px;border-radius:10px;background:#0A0B0C;border:1px solid rgba(233,236,239,.07);cursor:ew-resize;touch-action:none;overflow:hidden">
+            <div style="position:absolute;left:0;top:0;bottom:0;width:20%;background:linear-gradient(90deg,rgba(91,208,140,.14),rgba(91,208,140,0))"></div>
+            <div style="position:absolute;left:20%;top:0;bottom:0;width:1px;background:rgba(233,236,239,.2)"></div>
+            <div style="position:absolute;left:{{ meterFillLeft }};top:0;bottom:0;width:{{ meterFillWidth }};background:{{ toneWash2 }}"></div>
+            <div style="position:absolute;left:{{ meterPct }};top:0;bottom:0;width:2px;background:{{ toneColor }};box-shadow:0 0 14px {{ toneColor }};transform:translateX(-1px)"></div>
+            <div style="position:absolute;left:83.3%;top:0;bottom:0;width:1px;background:rgba(228,103,79,.35)"></div>
+            <div style="position:absolute;left:6px;bottom:5px;font:400 9.5px/1 'JetBrains Mono',monospace;color:#6B7278">−300</div>
+            <div style="position:absolute;left:calc(20% + 6px);top:6px;font:400 9.5px/1 'JetBrains Mono',monospace;color:#6B7278">0</div>
+            <div style="position:absolute;left:calc(83.3% + 6px);top:6px;font:400 9.5px/1 'JetBrains Mono',monospace;color:#E4674F">cap 950</div>
+            <div style="position:absolute;right:6px;bottom:5px;font:400 9.5px/1 'JetBrains Mono',monospace;color:#6B7278">+1,200</div>
+          </div>
+
+          <div style="display:grid;gap:1px;background:rgba(233,236,239,.06);border-top:1px solid rgba(233,236,239,.06)">
+            <div style="display:grid;grid-template-columns:1fr auto;gap:16px;background:#0E1011;padding:12px 20px;align-items:center">
+              <span style="font:400 13px/1.4 Archivo,sans-serif;color:#9BA1A6">baseFeePips</span>
+              <span style="font:400 13px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#E7EAEC">500</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr auto;gap:16px;background:#0E1011;padding:12px 20px;align-items:center">
+              <span style="font:400 13px/1.4 Archivo,sans-serif;color:#9BA1A6">⌈ drift × 100 pips/tick × 10.00% ⌉</span>
+              <span style="font:400 13px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:{{ toneColor }}">{{ surchargeText }}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr auto;gap:16px;background:#0E1011;padding:12px 20px;align-items:center">
+              <span style="font:400 13px/1.4 Archivo,sans-serif;color:#9BA1A6">Uncapped quote</span>
+              <span style="font:400 13px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#9BA1A6">{{ rawPipsText }}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr auto;gap:16px;background:#0E1011;padding:12px 20px;align-items:center">
+              <span style="font:400 13px/1.4 Archivo,sans-serif;color:#9BA1A6">clamp( 100 , 10,000 )</span>
+              <span style="font:600 15px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:{{ toneColor }}">{{ feePipsText }} pips</span>
+            </div>
+          </div>
+
+          <sc-if value="{{ hasOverflow }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:flex-start;gap:11px;padding:14px 20px;background:#100E0A;border-top:1px solid rgba(233,165,68,.22);animation:assayRise .24s ease">
+              <span style="width:6px;height:6px;border-radius:50%;background:#E9A544;flex:none;margin-top:5px"></span>
+              <div>
+                <div style="font:600 12.5px/1.3 Archivo,sans-serif;color:#E9A544;margin-bottom:5px">Fee-cap overflow — {{ overflowText }} pips donated</div>
+                <div style="font:400 12.5px/1.5 Archivo,sans-serif;color:#9A8B72;max-width:64ch">The uncapped formula wants more than a percentage-of-notional fee can express. The remainder is taken in the unspecified currency and routed to in-range liquidity providers via <span style="font-family:'JetBrains Mono',monospace">poolManager.donate()</span> — no escrow, no owner, no withdrawal path.</div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="background:#0E1011;border:1px solid rgba(233,236,239,.09);border-radius:16px;padding:18px 20px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:16px">
+            <div>
+              <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#6B7278;margin-bottom:8px">Same block, same pool</div>
+              <div style="font:500 14.5px/1.4 Archivo,sans-serif">What the opposite direction is quoted right now</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div style="border:1px solid {{ toneBorder }};background:{{ toneWash }};border-radius:12px;padding:14px 16px">
+              <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:{{ toneColor }};margin-bottom:12px">{{ dirLabel }}</div>
+              <div style="font:600 26px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:{{ toneColor }};margin-bottom:9px">{{ feeBpText }}</div>
+              <div style="font:400 12px/1.5 Archivo,sans-serif;color:#9BA1A6">Captures {{ driftAbs }} ticks of drift. Charged a share of what it picks off.</div>
+            </div>
+            <div style="border:1px solid rgba(91,208,140,.2);background:rgba(91,208,140,.05);border-radius:12px;padding:14px 16px">
+              <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:#5BD08C;margin-bottom:12px">{{ twinDirLabel }}</div>
+              <div style="font:600 26px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#5BD08C;margin-bottom:9px">{{ twinBpText }}</div>
+              <div style="font:400 12px/1.5 Archivo,sans-serif;color:#9BA1A6">Trades away from the reference, captures nothing, quoted below base.</div>
+            </div>
+          </div>
+          <div style="margin-top:14px;font:400 12px/1.55 Archivo,sans-serif;color:#6B7278">Spread of <span style="font-family:'JetBrains Mono',monospace;color:#9BA1A6">{{ spreadText }}</span> between two swaps a volatility-driven hook would quote identically. Measured in <span style="font-family:'JetBrains Mono',monospace">test/integration/DynamicPricing.t.sol</span> at 100 bp against 1 bp.</div>
+        </div>
+
+        <div style="background:#0E1011;border:1px solid rgba(233,236,239,.09);border-radius:16px;padding:18px 20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:15px">
+            <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#6B7278">Execution path</div>
+            <div style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278">1 hop · v4 singleton</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:8px;height:34px;padding:0 12px 0 8px;border-radius:17px;background:#151819;border:1px solid rgba(233,236,239,.08)">
+              <span style="width:20px;height:20px;border-radius:50%;background:{{ inTokenColor }};display:flex;align-items:center;justify-content:center;font:600 8px/1 'JetBrains Mono',monospace;color:#0A0B0C">{{ inTokenGlyph }}</span>
+              <span style="font:500 12.5px/1 Archivo,sans-serif">{{ inTokenSymbol }}</span>
+            </div>
+            <span style="color:#3A3F42;font:400 13px/1 'JetBrains Mono',monospace">──</span>
+            <div style="display:flex;align-items:center;gap:9px;height:34px;padding:0 13px;border-radius:9px;background:rgba(79,195,232,.09);border:1px solid rgba(79,195,232,.25)">
+              <img src="assets/assay-mark-light.svg" alt="" style="width:14px;height:14px;display:block;opacity:.9">
+              <span style="font:500 12.5px/1 'JetBrains Mono',monospace;color:#4FC3E8">AssayHook · {{ feePipsText }} pips</span>
+            </div>
+            <span style="color:#3A3F42;font:400 13px/1 'JetBrains Mono',monospace">──</span>
+            <div style="display:flex;align-items:center;gap:8px;height:34px;padding:0 12px 0 8px;border-radius:17px;background:#151819;border:1px solid rgba(233,236,239,.08)">
+              <span style="width:20px;height:20px;border-radius:50%;background:{{ outTokenColor }};display:flex;align-items:center;justify-content:center;font:600 8px/1 'JetBrains Mono',monospace;color:#0A0B0C">{{ outTokenGlyph }}</span>
+              <span style="font:500 12.5px/1 Archivo,sans-serif">{{ outTokenSymbol }}</span>
+            </div>
+          </div>
+          <div style="display:grid;gap:1px;background:rgba(233,236,239,.06);border:1px solid rgba(233,236,239,.06);border-radius:10px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;background:#0A0B0C;padding:10px 13px">
+              <span style="font:400 12px/1 'JetBrains Mono',monospace;color:#6B7278">hook</span>
+              <a href="https://sepolia.basescan.org/address/0xa3A9901c03bB63232abaA7493AA4a21b71B5b0c4" target="_blank" rel="noreferrer" style="font:400 12px/1 'JetBrains Mono',monospace">0xa3A9901c…B5b0c4 ↗</a>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;background:#0A0B0C;padding:10px 13px">
+              <span style="font:400 12px/1 'JetBrains Mono',monospace;color:#6B7278">reference</span>
+              <span style="font:400 12px/1 'JetBrains Mono',monospace;color:#9BA1A6">{{ oracleLabel }}</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;background:#0A0B0C;padding:10px 13px">
+              <span style="font:400 12px/1 'JetBrains Mono',monospace;color:#6B7278">pool tick / reference tick</span>
+              <span style="font:400 12px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#9BA1A6">{{ tickPair }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#0E1011;border:1px solid rgba(233,236,239,.09);border-radius:16px;padding:18px 20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px">
+            <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#6B7278">Hook events, this pool</div>
+            <div style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278">{{ eventCount }}</div>
+          </div>
+          <sc-for list="{{ events }}" as="ev" hint-placeholder-count="3">
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:9px 0;border-top:1px solid rgba(233,236,239,.05)">
+              <span style="font:500 10.5px/1 'JetBrains Mono',monospace;padding:4px 6px;border-radius:4px;background:{{ ev.wash }};color:{{ ev.color }}">{{ ev.name }}</span>
+              <span style="font:400 12px/1.4 'JetBrains Mono',monospace;color:#9BA1A6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ev.args }}</span>
+              <span style="font:400 11px/1 'JetBrains Mono',monospace;color:#6B7278">{{ ev.when }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+      </div>
+    </div>
+  </main>
+  </sc-if>
+
+  <sc-if value="{{ isMarkets }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width:1240px;margin:0 auto;padding:36px 24px 90px">
+
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:26px;flex-wrap:wrap">
+      <div>
+        <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#6B7278;margin-bottom:12px">Markets · one pool, one oracle pair</div>
+        <h1 style="margin:0 0 10px;font:600 32px/1.15 Archivo,sans-serif;letter-spacing:-.025em">Quoted fees, by the flow that earned them</h1>
+        <p style="margin:0;max-width:66ch;font:400 14.5px/1.6 Archivo,sans-serif;color:#9BA1A6;text-wrap:pretty">The hook refuses any pool whose currencies do not match the pair its oracle declares, so there is exactly one market to show. Everything below is derived from <span style="font-family:'JetBrains Mono',monospace">SwapAssayed</span> events.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex:none">
+        <sc-for list="{{ ranges }}" as="r" hint-placeholder-count="5">
+          <button onClick="{{ r.pick }}" style="height:30px;min-width:44px;padding:0 11px;border-radius:8px;background:{{ r.bg }};border:1px solid {{ r.bd }};cursor:pointer;font:500 12px/1 'JetBrains Mono',monospace;color:{{ r.fg }}">{{ r.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:rgba(233,236,239,.07);border:1px solid rgba(233,236,239,.07);border-radius:14px;overflow:hidden;margin-bottom:20px">
+      <div style="background:#0E1011;padding:19px 21px">
+        <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:11px">TVL</div>
+        <div style="font:500 25px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">{{ mTvl }}</div>
+        <div style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#5BD08C;margin-top:7px">{{ mTvlChange }}</div>
+      </div>
+      <div style="background:#0E1011;padding:19px 21px">
+        <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:11px">Volume</div>
+        <div style="font:500 25px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">{{ mVol }}</div>
+        <div style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278;margin-top:7px">{{ mSwaps }} swaps</div>
+      </div>
+      <div style="background:#0E1011;padding:19px 21px">
+        <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:11px">LP fees</div>
+        <div style="font:500 25px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">{{ mFees }}</div>
+        <div style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278;margin-top:7px;white-space:nowrap">{{ mDonated }} donated</div>
+      </div>
+      <div style="background:#0E1011;padding:19px 21px">
+        <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:11px">Mean quote</div>
+        <div style="font:500 25px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#4FC3E8">{{ mMeanFee }}</div>
+        <div style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278;margin-top:7px">volume-weighted</div>
+      </div>
+      <div style="background:#0E1011;padding:19px 21px">
+        <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:11px">Reference uptime</div>
+        <div style="font:500 25px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">{{ mUptime }}</div>
+        <div style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#E9A544;margin-top:7px">{{ mStaleSpans }}</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px;margin-bottom:20px">
+
+      <div style="background:#0E1011;border:1px solid rgba(233,236,239,.09);border-radius:16px;overflow:hidden">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 20px 12px">
+          <div>
+            <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#6B7278;margin-bottom:8px">Quoted fee, per swap</div>
+            <div style="font:500 14.5px/1.4 Archivo,sans-serif">Each point is one <span style="font-family:'JetBrains Mono',monospace;color:#9BA1A6">SwapAssayed</span> event, coloured by direction</div>
+          </div>
+          <div style="display:flex;gap:14px;flex:none">
+            <span style="display:flex;align-items:center;gap:6px;font:400 11px/1 'JetBrains Mono',monospace;color:#6B7278"><span style="width:6px;height:6px;border-radius:50%;background:#5BD08C"></span>away</span>
+            <span style="display:flex;align-items:center;gap:6px;font:400 11px/1 'JetBrains Mono',monospace;color:#6B7278"><span style="width:6px;height:6px;border-radius:50%;background:#E9A544"></span>capturing</span>
+          </div>
+        </div>
+        <div style="position:relative;height:262px">
+          <svg viewBox="0 0 700 262" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;display:block">
+            <line x1="0" y1="34" x2="700" y2="34" stroke="rgba(228,103,79,.22)" stroke-width="1" stroke-dasharray="4 4"></line>
+            <line x1="0" y1="104" x2="700" y2="104" stroke="rgba(233,236,239,.05)" stroke-width="1"></line>
+            <line x1="0" y1="174" x2="700" y2="174" stroke="rgba(79,195,232,.2)" stroke-width="1" stroke-dasharray="4 4"></line>
+            <line x1="0" y1="232" x2="700" y2="232" stroke="rgba(91,208,140,.2)" stroke-width="1" stroke-dasharray="4 4"></line>
+            <circle cx="22" cy="228" r="3" fill="#5BD08C"></circle><circle cx="46" cy="176" r="3" fill="#5BD08C"></circle>
+            <circle cx="63" cy="141" r="3.4" fill="#E9A544"></circle><circle cx="88" cy="230" r="3" fill="#5BD08C"></circle>
+            <circle cx="104" cy="168" r="3" fill="#5BD08C"></circle><circle cx="126" cy="112" r="3.4" fill="#E9A544"></circle>
+            <circle cx="149" cy="226" r="3" fill="#5BD08C"></circle><circle cx="167" cy="86" r="3.6" fill="#E9A544"></circle>
+            <circle cx="188" cy="174" r="3" fill="#5BD08C"></circle><circle cx="206" cy="231" r="3" fill="#5BD08C"></circle>
+            <circle cx="228" cy="128" r="3.4" fill="#E9A544"></circle><circle cx="249" cy="178" r="3" fill="#5BD08C"></circle>
+            <circle cx="268" cy="34" r="4.4" fill="#E4674F"></circle><circle cx="284" cy="229" r="3" fill="#5BD08C"></circle>
+            <circle cx="302" cy="172" r="3" fill="#5BD08C"></circle><circle cx="321" cy="149" r="3.4" fill="#E9A544"></circle>
+            <circle cx="344" cy="232" r="3" fill="#5BD08C"></circle><circle cx="362" cy="118" r="3.4" fill="#E9A544"></circle>
+            <circle cx="381" cy="176" r="3" fill="#5BD08C"></circle><circle cx="404" cy="228" r="3" fill="#5BD08C"></circle>
+            <circle cx="423" cy="96" r="3.6" fill="#E9A544"></circle><circle cx="441" cy="174" r="3" fill="#5BD08C"></circle>
+            <circle cx="462" cy="231" r="3" fill="#5BD08C"></circle><circle cx="482" cy="34" r="4.4" fill="#E4674F"></circle>
+            <circle cx="501" cy="163" r="3" fill="#5BD08C"></circle><circle cx="522" cy="134" r="3.4" fill="#E9A544"></circle>
+            <circle cx="544" cy="229" r="3" fill="#5BD08C"></circle><circle cx="562" cy="175" r="3" fill="#5BD08C"></circle>
+            <circle cx="583" cy="107" r="3.4" fill="#E9A544"></circle><circle cx="604" cy="230" r="3" fill="#5BD08C"></circle>
+            <circle cx="622" cy="172" r="3" fill="#5BD08C"></circle><circle cx="641" cy="152" r="3.4" fill="#E9A544"></circle>
+            <circle cx="662" cy="227" r="3" fill="#5BD08C"></circle><circle cx="682" cy="174" r="3" fill="#5BD08C"></circle>
+          </svg>
+          <div style="position:absolute;left:12px;top:20px;font:400 10px/1 'JetBrains Mono',monospace;color:#E4674F">1.00% ceiling</div>
+          <div style="position:absolute;left:12px;top:161px;font:400 10px/1 'JetBrains Mono',monospace;color:#4FC3E8">0.05% base</div>
+          <div style="position:absolute;left:12px;top:219px;font:400 10px/1 'JetBrains Mono',monospace;color:#5BD08C">0.01% floor</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid rgba(233,236,239,.06);font:400 11px/1 'JetBrains Mono',monospace;color:#6B7278">
+          <span>{{ mRangeStart }}</span><span>Two swaps hit the cap; the overflow was donated.</span><span>now</span>
+        </div>
+      </div>
+
+      <div style="background:#0E1011;border:1px solid rgba(233,236,239,.09);border-radius:16px;padding:18px 20px">
+        <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#6B7278;margin-bottom:8px">Distribution of quotes</div>
+        <div style="font:500 14.5px/1.4 Archivo,sans-serif;margin-bottom:20px">Share of volume by quoted fee</div>
+
+        <div style="display:grid;gap:14px">
+          <div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px;font:400 12px/1 'JetBrains Mono',monospace;color:#9BA1A6"><span>0.01% floor</span><span style="color:#E7EAEC">31.4%</span></div>
+            <div style="height:7px;border-radius:4px;background:#131617;overflow:hidden"><div style="width:31.4%;height:100%;background:#5BD08C"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px;font:400 12px/1 'JetBrains Mono',monospace;color:#9BA1A6"><span>0.01 – 0.05%</span><span style="color:#E7EAEC">18.2%</span></div>
+            <div style="height:7px;border-radius:4px;background:#131617;overflow:hidden"><div style="width:18.2%;height:100%;background:#4FC3E8"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px;font:400 12px/1 'JetBrains Mono',monospace;color:#9BA1A6"><span>0.05 – 0.10%</span><span style="color:#E7EAEC">24.7%</span></div>
+            <div style="height:7px;border-radius:4px;background:#131617;overflow:hidden"><div style="width:24.7%;height:100%;background:#4FC3E8"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px;font:400 12px/1 'JetBrains Mono',monospace;color:#9BA1A6"><span>0.10 – 0.40%</span><span style="color:#E7EAEC">17.1%</span></div>
+            <div style="height:7px;border-radius:4px;background:#131617;overflow:hidden"><div style="width:17.1%;height:100%;background:#E9A544"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px;font:400 12px/1 'JetBrains Mono',monospace;color:#9BA1A6"><span>0.40 – 1.00%</span><span style="color:#E7EAEC">8.1%</span></div>
+            <div style="height:7px;border-radius:4px;background:#131617;overflow:hidden"><div style="width:8.1%;height:100%;background:#E9A544"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px;font:400 12px/1 'JetBrains Mono',monospace;color:#9BA1A6"><span>at the 1.00% cap</span><span style="color:#E7EAEC">0.5%</span></div>
+            <div style="height:7px;border-radius:4px;background:#131617;overflow:hidden"><div style="width:2%;height:100%;background:#E4674F"></div></div>
+          </div>
+        </div>
+
+        <div style="margin-top:22px;padding:13px 14px;border-radius:11px;background:#0A0B0C;border:1px solid rgba(233,236,239,.07);font:400 12.5px/1.55 Archivo,sans-serif;color:#9BA1A6">Half of all volume is quoted at or below the base fee. A volatility-driven hook would have charged every one of these swaps the same rate.</div>
+      </div>
+    </div>
+
+    <div style="background:#0E1011;border:1px solid rgba(233,236,239,.09);border-radius:16px;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:17px 20px 15px;border-bottom:1px solid rgba(233,236,239,.07)">
+        <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#6B7278">Pool</div>
+        <div style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278">poolId 0x9c4e…af12 · fee flag 0x800000 dynamic</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1.6fr repeat(5,1fr);gap:16px;padding:11px 20px;background:#0A0B0C;border-bottom:1px solid rgba(233,236,239,.05);font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278">
+        <div>Pair</div><div style="text-align:right">TVL</div><div style="text-align:right">Volume</div><div style="text-align:right">Fees</div><div style="text-align:right">Mean quote</div><div style="text-align:right">Reference</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1.6fr repeat(5,1fr);gap:16px;padding:16px 20px;align-items:center">
+        <div style="display:flex;align-items:center;gap:11px">
+          <span style="display:flex"><span style="width:24px;height:24px;border-radius:50%;background:#C3C8D4;border:2px solid #0E1011"></span><span style="width:24px;height:24px;border-radius:50%;background:#6FB3E8;border:2px solid #0E1011;margin-left:-9px"></span></span>
+          <span>
+            <span style="display:block;font:600 14px/1.2 Archivo,sans-serif">{{ mPair }}</span>
+            <span style="display:block;font:400 11px/1 'JetBrains Mono',monospace;color:#6B7278;margin-top:4px">{{ mChain }}</span>
+          </span>
+        </div>
+        <div style="text-align:right;font:400 13.5px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">{{ mTvl }}</div>
+        <div style="text-align:right;font:400 13.5px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">{{ mVol }}</div>
+        <div style="text-align:right;font:400 13.5px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">{{ mFees }}</div>
+        <div style="text-align:right;font:400 13.5px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#4FC3E8">{{ mMeanFee }}</div>
+        <div style="text-align:right;font:400 12px/1 'JetBrains Mono',monospace;color:#5BD08C">fresh</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:11px;padding:15px 20px;border-top:1px solid rgba(233,236,239,.06);background:#0A0B0C">
+        <span style="width:34px;height:34px;border-radius:9px;border:1px dashed rgba(233,236,239,.16);flex:none"></span>
+        <div style="flex:1">
+          <div style="font:500 13px/1.3 Archivo,sans-serif;color:#9BA1A6">No other pools</div>
+          <div style="font:400 12px/1.45 Archivo,sans-serif;color:#6B7278;margin-top:3px">A second market needs a second oracle adapter and a second mined hook address — configuration is immutable, so recalibration means a new deployment.</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+  </sc-if>
+
+  <sc-if value="{{ isDocs }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width:1400px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:236px minmax(0,1fr) 190px;gap:44px;align-items:start">
+
+    <aside style="position:sticky;top:76px;padding:30px 0 40px">
+      <button onClick="{{ openSearch }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;height:34px;padding:0 10px;border-radius:8px;background:#101214;border:1px solid rgba(233,236,239,.08);cursor:pointer;margin-bottom:26px;font:400 12.5px/1 Archivo,sans-serif;color:#6B7278" style-hover="border-color:rgba(233,236,239,.2);color:#9BA1A6">
+        <span>Search docs</span>
+        <span style="font:500 10.5px/1 'JetBrains Mono',monospace;padding:3px 5px;border-radius:4px;background:#191C1E;color:#9BA1A6">⌘K</span>
+      </button>
+      <sc-for list="{{ docNav }}" as="d" hint-placeholder-count="6">
+        <div>
+          <sc-if value="{{ d.isHeading }}" hint-placeholder-val="{{ false }}">
+            <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#6B7278;margin:22px 0 9px;padding-left:10px">{{ d.label }}</div>
+          </sc-if>
+          <sc-if value="{{ d.isLink }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ d.pick }}" style="display:block;width:100%;text-align:left;padding:6px 10px;border-radius:7px;border:0;border-left:2px solid {{ d.bar }};background:{{ d.bg }};cursor:pointer;font:{{ d.weight }} 13px/1.5 Archivo,sans-serif;color:{{ d.fg }}" style-hover="color:#E7EAEC">{{ d.label }}</button>
+          </sc-if>
+        </div>
+      </sc-for>
+    </aside>
+
+    <article style="padding:30px 0 96px;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px;font:400 12px/1 'JetBrains Mono',monospace;color:#6B7278;margin-bottom:22px">
+        <span>Docs</span><span style="color:#3A3F42">/</span><span style="color:#9BA1A6">{{ docCrumb }}</span>
+      </div>
+
+      <sc-if value="{{ isDocIntro }}" hint-placeholder-val="{{ true }}">
+        <div>
+          <h1 style="margin:0 0 18px;font:600 36px/1.15 Archivo,sans-serif;letter-spacing:-.03em">Introduction</h1>
+          <p style="margin:0 0 20px;font:400 16px/1.7 Archivo,sans-serif;color:#B7BCC0;max-width:70ch;text-wrap:pretty">Assay is a Uniswap v4 hook that prices adverse selection <em style="font-style:normal;color:#E7EAEC">per swap</em> rather than per pool. Since v4, <code style="font:400 14px/1 'JetBrains Mono',monospace;background:#131617;border:1px solid rgba(233,236,239,.07);border-radius:5px;padding:2px 5px">beforeSwap</code> can return a fee for one specific swap. Assay uses that.</p>
+          <p style="margin:0 0 28px;font:400 15px/1.7 Archivo,sans-serif;color:#9BA1A6;max-width:70ch;text-wrap:pretty">It is a pricing mechanism, not an access-control mechanism. It never blocks, never censors, and never takes custody of swap principal.</p>
+
+          <div style="display:flex;align-items:flex-start;gap:12px;padding:16px 18px;border-radius:12px;background:#100E0A;border:1px solid rgba(233,165,68,.22);margin-bottom:36px">
+            <span style="width:6px;height:6px;border-radius:50%;background:#E9A544;flex:none;margin-top:7px"></span>
+            <div>
+              <div style="font:600 13.5px/1.3 Archivo,sans-serif;color:#E9A544;margin-bottom:6px">Status</div>
+              <div style="font:400 13.5px/1.6 Archivo,sans-serif;color:#9A8B72;max-width:68ch">Unaudited, and never having held value. Base Sepolia only. The adverse-selection gate does not currently pass — the mechanism is implemented and deployed; the evidence that it improves liquidity-provider outcomes is not established.</div>
+            </div>
+          </div>
+
+          <h2 style="margin:0 0 14px;font:600 22px/1.25 Archivo,sans-serif;letter-spacing:-.02em">The problem</h2>
+          <p style="margin:0 0 20px;font:400 15px/1.7 Archivo,sans-serif;color:#9BA1A6;max-width:70ch;text-wrap:pretty">Every dynamic-fee hook shipping today sets the fee from volatility. Volatility is a property of the market, so it is identical for everyone in a block: a retail swap and a top-of-block arbitrage pay the same rate, though one is the liquidity provider's entire revenue and the other is their entire loss.</p>
+          <p style="margin:0 0 28px;font:400 15px/1.7 Archivo,sans-serif;color:#9BA1A6;max-width:70ch;text-wrap:pretty">Assay's fee is a share of the price drift a swap captures against a cached reference, signed by direction — so two swaps in the same block trading opposite directions are quoted differently. Measured at <span style="font-family:'JetBrains Mono',monospace;color:#E7EAEC">100 bp against 1 bp</span>, same block, same pool.</p>
+
+          <h2 style="margin:0 0 14px;font:600 22px/1.25 Archivo,sans-serif;letter-spacing:-.02em">Deployment</h2>
+          <div style="display:grid;gap:1px;background:rgba(233,236,239,.07);border:1px solid rgba(233,236,239,.07);border-radius:11px;overflow:hidden;margin-bottom:16px;max-width:70ch">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;background:#0E1011;padding:12px 15px">
+              <span style="font:400 12.5px/1 'JetBrains Mono',monospace;color:#6B7278">AssayHook</span>
+              <a href="https://sepolia.basescan.org/address/0xa3A9901c03bB63232abaA7493AA4a21b71B5b0c4" target="_blank" rel="noreferrer" style="font:400 12.5px/1 'JetBrains Mono',monospace">0xa3A9901c…B5b0c4 ↗</a>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;background:#0E1011;padding:12px 15px">
+              <span style="font:400 12.5px/1 'JetBrains Mono',monospace;color:#6B7278">ChainlinkReferenceAdapter</span>
+              <a href="https://sepolia.basescan.org/address/0x68E65451A97261B451f186e9B9099c3fBF7efc90" target="_blank" rel="noreferrer" style="font:400 12.5px/1 'JetBrains Mono',monospace">0x68E65451…F7efc90 ↗</a>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;background:#0E1011;padding:12px 15px">
+              <span style="font:400 12.5px/1 'JetBrains Mono',monospace;color:#6B7278">Permission mask</span>
+              <span style="font:400 12.5px/1 'JetBrains Mono',monospace;color:#9BA1A6">0x30C4</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;background:#0E1011;padding:12px 15px">
+              <span style="font:400 12.5px/1 'JetBrains Mono',monospace;color:#6B7278">Runtime bytecode</span>
+              <span style="font:400 12.5px/1 'JetBrains Mono',monospace;color:#9BA1A6">9,625 bytes · reproducible</span>
+            </div>
+          </div>
+          <p style="margin:0;font:400 13.5px/1.65 Archivo,sans-serif;color:#6B7278;max-width:70ch">The deployed runtime reproduces byte-for-byte from a clean checkout, which is why <span style="font-family:'JetBrains Mono',monospace">foundry.toml</span> disables <span style="font-family:'JetBrains Mono',monospace">bytecode_hash</span> and <span style="font-family:'JetBrains Mono',monospace">cbor_metadata</span>.</p>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isDocMech }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <h1 style="margin:0 0 18px;font:600 36px/1.15 Archivo,sans-serif;letter-spacing:-.03em">The fee formula</h1>
+          <p style="margin:0 0 24px;font:400 16px/1.7 Archivo,sans-serif;color:#B7BCC0;max-width:70ch;text-wrap:pretty">The mechanism is the no-arbitrage band, not a fitted model. An arbitrageur profits only while the drift they capture exceeds what they pay for it, so charging a <em style="font-style:normal;color:#E7EAEC">fraction</em> of that drift takes back part of the extraction while leaving the trade worth doing.</p>
+
+          <div style="background:#0A0B0C;border:1px solid rgba(233,236,239,.08);border-radius:12px;padding:18px 20px;margin-bottom:14px;overflow-x:auto;font:400 13.5px/2 'JetBrains Mono',monospace;color:#B7BCC0"><span style="color:#6B7278">// FeeBlend.sol — _rawQuotedPips</span><br>drift&nbsp;&nbsp;&nbsp;&nbsp; = clamp(signedMispricingTicks, ±200_000)<br>scaled&nbsp;&nbsp;&nbsp;= drift × <span style="color:#4FC3E8">100</span> × captureShareBps<br>surcharge = ⌈ scaled / <span style="color:#4FC3E8">10_000</span> ⌉&nbsp;&nbsp;<span style="color:#6B7278">// toward +∞</span><br>quoted&nbsp;&nbsp;&nbsp;= baseFeePips + surcharge<br>fee&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= clamp(quoted, minFeePips, maxFeePips)</div>
+          <p style="margin:0 0 30px;font:400 13.5px/1.65 Archivo,sans-serif;color:#6B7278;max-width:70ch">Rounded toward positive infinity so the quoted fee is never below the exact value. Solidity's signed division truncates toward zero, which lowers the fee on the capturing side — the toxic side — and is therefore the liquidity-adverse direction.</p>
+
+          <h2 style="margin:0 0 14px;font:600 22px/1.25 Archivo,sans-serif;letter-spacing:-.02em">Deployed parameters</h2>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:rgba(233,236,239,.07);border:1px solid rgba(233,236,239,.07);border-radius:11px;overflow:hidden;margin-bottom:14px;max-width:70ch">
+            <div style="background:#0E1011;padding:15px 17px"><div style="font:400 11px/1 'JetBrains Mono',monospace;color:#6B7278;margin-bottom:9px">baseFeePips</div><div style="font:500 18px/1 'JetBrains Mono',monospace">500</div></div>
+            <div style="background:#0E1011;padding:15px 17px"><div style="font:400 11px/1 'JetBrains Mono',monospace;color:#6B7278;margin-bottom:9px">minFeePips</div><div style="font:500 18px/1 'JetBrains Mono',monospace">100</div></div>
+            <div style="background:#0E1011;padding:15px 17px"><div style="font:400 11px/1 'JetBrains Mono',monospace;color:#6B7278;margin-bottom:9px">maxFeePips</div><div style="font:500 18px/1 'JetBrains Mono',monospace">10,000</div></div>
+            <div style="background:#0E1011;padding:15px 17px"><div style="font:400 11px/1 'JetBrains Mono',monospace;color:#6B7278;margin-bottom:9px">captureShareBps</div><div style="font:500 18px/1 'JetBrains Mono',monospace;color:#4FC3E8">1,000</div></div>
+          </div>
+          <p style="margin:0 0 30px;font:400 13.5px/1.65 Archivo,sans-serif;color:#6B7278;max-width:70ch">One tick is one basis point of price, and fees are quoted in hundredths of a basis point, so a tick of drift is worth 100 pips of fee. At a 10% capture share, each tick of drift adds 10 pips: the cap is reached at 950 ticks.</p>
+
+          <h2 style="margin:0 0 14px;font:600 22px/1.25 Archivo,sans-serif;letter-spacing:-.02em">Why 1,000 bps and not 5,000</h2>
+          <p style="margin:0 0 20px;font:400 15px/1.7 Archivo,sans-serif;color:#9BA1A6;max-width:70ch;text-wrap:pretty">The capture share is calibrated conservatively. <span style="font-family:'JetBrains Mono',monospace">calibrate_capture_share.py</span> searches for the share with the least bad worst case across two independent windows of flow and the full plausible range of uninformed fee elasticity — rather than the share scoring highest under one assumption. Worst case at 1,000 bps is <span style="color:#E9A544;font-family:'JetBrains Mono',monospace">−$935</span> over three days on $317M of volume; the previous 5,000 had a worst case thirteen times larger for about three times the upside.</p>
+          <p style="margin:0 0 30px;font:400 15px/1.7 Archivo,sans-serif;color:#9BA1A6;max-width:70ch;text-wrap:pretty">The elasticity is bounded rather than measured. Uniswap runs ETH/USDC at both 5 bp and 30 bp with real volume at each, which rules out the high end; estimating it from cross-tier volumes would tighten this considerably.</p>
+
+          <h2 style="margin:0 0 14px;font:600 22px/1.25 Archivo,sans-serif;letter-spacing:-.02em">The fee-cap overflow</h2>
+          <p style="margin:0 0 16px;font:400 15px/1.7 Archivo,sans-serif;color:#9BA1A6;max-width:70ch;text-wrap:pretty">An LP fee above a few percent is not a sane pool parameter regardless of what the formula asks for, so <span style="font-family:'JetBrains Mono',monospace">quote</span> clamps. On an extreme dislocation the discarded remainder is recovered as an absolute amount and routed straight to in-range liquidity providers.</p>
+          <div style="background:#0A0B0C;border:1px solid rgba(233,236,239,.08);border-radius:12px;padding:18px 20px;overflow-x:auto;font:400 13.5px/2 'JetBrains Mono',monospace;color:#B7BCC0"><span style="color:#6B7278">// afterSwap</span><br>overflowPips = raw − maxFeePips&nbsp;&nbsp;<span style="color:#6B7278">// bounded at 1_000_000</span><br>poolManager.<span style="color:#5BD08C">donate</span>(amount)&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#6B7278">// no escrow, no owner</span><br><span style="color:#6B7278">return</span> +int128(amount)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#6B7278">// nets to zero, unspecified currency</span></div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isDocV4 }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <h1 style="margin:0 0 18px;font:600 36px/1.15 Archivo,sans-serif;letter-spacing:-.03em">v4 constraints</h1>
+          <p style="margin:0 0 30px;font:400 16px/1.7 Archivo,sans-serif;color:#B7BCC0;max-width:70ch;text-wrap:pretty">These constraints shape the code. Integrations that ignore them break in ways that are not obvious from the interface.</p>
+          <div style="display:grid;gap:12px;max-width:76ch">
+            <div style="background:#0E1011;border:1px solid rgba(233,236,239,.08);border-radius:12px;padding:17px 19px">
+              <div style="font:600 14px/1.3 Archivo,sans-serif;margin-bottom:8px">Permissions live in the address, not in code</div>
+              <div style="font:400 13.5px/1.65 Archivo,sans-serif;color:#9BA1A6">The last 14 bits of the deployed address carry the flags, and the address is CREATE2-mined. Declaring a flag without implementing its callback bricks the pool; implementing a callback whose flag is absent means it is silently never called. Flags in use: BEFORE_INITIALIZE, AFTER_INITIALIZE, BEFORE_SWAP, AFTER_SWAP, AFTER_SWAP_RETURNS_DELTA — mask <span style="font-family:'JetBrains Mono',monospace;color:#E7EAEC">0x30C4</span>.</div>
+            </div>
+            <div style="background:#0E1011;border:1px solid rgba(233,236,239,.08);border-radius:12px;padding:17px 19px">
+              <div style="font:600 14px/1.3 Archivo,sans-serif;margin-bottom:8px">Dynamic fee handshake</div>
+              <div style="font:400 13.5px/1.65 Archivo,sans-serif;color:#9BA1A6">The pool must be initialised with <span style="font-family:'JetBrains Mono',monospace">key.fee == DYNAMIC_FEE_FLAG (0x800000)</span>. The per-swap override returns <span style="font-family:'JetBrains Mono',monospace">fee | OVERRIDE_FEE_FLAG (0x400000)</span> as the third return value of <span style="font-family:'JetBrains Mono',monospace">beforeSwap</span>. Fee units are hundredths of a bip; MAX_LP_FEE is 1,000,000.</div>
+            </div>
+            <div style="background:#0E1011;border:1px solid rgba(233,236,239,.08);border-radius:12px;padding:17px 19px">
+              <div style="font:600 14px/1.3 Archivo,sans-serif;margin-bottom:8px"><span style="font-family:'JetBrains Mono',monospace">sender</span> is the router, never the trader</div>
+              <div style="font:400 13.5px/1.65 Archivo,sans-serif;color:#9BA1A6">It is never a user identity. Any logic treating it as one is a critical finding — which is why the quote is derived from the drift a swap captures and not from who submitted it.</div>
+            </div>
+            <div style="background:#0E1011;border:1px solid rgba(233,236,239,.08);border-radius:12px;padding:17px 19px">
+              <div style="font:600 14px/1.3 Archivo,sans-serif;margin-bottom:8px">The zero-hookData path must work</div>
+              <div style="font:400 13.5px/1.65 Archivo,sans-serif;color:#9BA1A6">If a swap cannot execute without custom <span style="font-family:'JetBrains Mono',monospace">hookData</span>, aggregators cannot route to the pool. Assay requires none.</div>
+            </div>
+            <div style="background:#0E1011;border:1px solid rgba(233,236,239,.08);border-radius:12px;padding:17px 19px">
+              <div style="font:600 14px/1.3 Archivo,sans-serif;margin-bottom:8px">One hook serves many pools</div>
+              <div style="font:400 13.5px/1.65 Archivo,sans-serif;color:#9BA1A6">All state is keyed by <span style="font-family:'JetBrains Mono',monospace">PoolId</span>. Any cross-pool aggregate state is a critical finding, and multi-pool isolation is fuzzed as an invariant.</div>
+            </div>
+            <div style="background:#0E1011;border:1px solid rgba(233,236,239,.08);border-radius:12px;padding:17px 19px">
+              <div style="font:600 14px/1.3 Archivo,sans-serif;margin-bottom:8px">Everything in the callbacks is on the hot path</div>
+              <div style="font:400 13.5px/1.65 Archivo,sans-serif;color:#9BA1A6">Three reachable paths are budgeted separately: ordinary swap 14,572 gas, block-boundary refresh 30,901 plus a ~16,500 live-feed premium, extreme dislocation 48,582. A live Chainlink read alone measures 20,774 gas, which is why the reference is cached.</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isDocInv }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <h1 style="margin:0 0 18px;font:600 36px/1.15 Archivo,sans-serif;letter-spacing:-.03em">Invariants</h1>
+          <p style="margin:0 0 26px;font:400 16px/1.7 Archivo,sans-serif;color:#B7BCC0;max-width:70ch;text-wrap:pretty">Ranked by consequence. The invariant suite fuzzes the <em style="font-style:normal;color:#E7EAEC">ordering itself</em> — swaps, liquidity changes, block advances and reference price events in any sequence — with <span style="font-family:'JetBrains Mono',monospace">fail_on_revert = true</span>, so a revert anywhere aborts the run rather than being absorbed.</p>
+          <div style="display:grid;gap:1px;background:rgba(233,236,239,.07);border:1px solid rgba(233,236,239,.07);border-radius:12px;overflow:hidden;max-width:76ch;margin-bottom:20px">
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;background:#0E1011;padding:14px 17px">
+              <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#6B7278">01</span>
+              <span style="font:400 13.5px/1.55 Archivo,sans-serif;color:#B7BCC0"><span style="font-family:'JetBrains Mono',monospace;color:#E7EAEC">beforeSwap</span> never reverts for any well-formed swap — any pool state, uninitialised or stale oracle, zero liquidity, extreme ticks. A revert here bricks the pool.</span>
+              <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#5BD08C">live</span>
+            </div>
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;background:#0E1011;padding:14px 17px">
+              <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#6B7278">02</span>
+              <span style="font:400 13.5px/1.55 Archivo,sans-serif;color:#B7BCC0">f_min ≤ quotedFee ≤ f_max ≤ MAX_LP_FEE for all inputs.</span>
+              <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#5BD08C">live</span>
+            </div>
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;background:#0E1011;padding:14px 17px">
+              <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#6B7278">04</span>
+              <span style="font:400 13.5px/1.55 Archivo,sans-serif;color:#B7BCC0">All hook deltas settle; <span style="font-family:'JetBrains Mono',monospace">NonzeroDeltaCount</span> reaches zero.</span>
+              <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#5BD08C">live</span>
+            </div>
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;background:#0E1011;padding:14px 17px">
+              <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#6B7278">05</span>
+              <span style="font:400 13.5px/1.55 Archivo,sans-serif;color:#B7BCC0">No cross-pool state contamination.</span>
+              <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#5BD08C">live</span>
+            </div>
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;background:#0E1011;padding:14px 17px">
+              <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#6B7278">08</span>
+              <span style="font:400 13.5px/1.55 Archivo,sans-serif;color:#B7BCC0">Rounding is directional and consistent, always in the LP's favour.</span>
+              <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#5BD08C">live</span>
+            </div>
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;background:#0E1011;padding:14px 17px">
+              <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#6B7278">09</span>
+              <span style="font:400 13.5px/1.55 Archivo,sans-serif;color:#B7BCC0">LP liquidity is never trapped. There is no hook on add or remove liquidity, structurally.</span>
+              <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#5BD08C">live</span>
+            </div>
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;background:#0A0B0C;padding:14px 17px">
+              <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#6B7278">03 · 06 · 07 · 10</span>
+              <span style="font:400 13.5px/1.55 Archivo,sans-serif;color:#6B7278">Not applicable: no rebate ledger, no posterior probability, no attestations, and variance is no longer computed on the swap path.</span>
+              <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#6B7278">n/a</span>
+            </div>
+          </div>
+          <p style="margin:0;font:400 13.5px/1.65 Archivo,sans-serif;color:#6B7278;max-width:70ch">156 tests. Seven stateful properties at 8,192 calls each. Four of the five real bugs found in this project came from state interactions across calls — which is what this reaches and a fixed test sequence does not.</p>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isDocRisk }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <h1 style="margin:0 0 18px;font:600 36px/1.15 Archivo,sans-serif;letter-spacing:-.03em">Risk &amp; known gaps</h1>
+          <p style="margin:0 0 26px;font:400 16px/1.7 Archivo,sans-serif;color:#B7BCC0;max-width:70ch;text-wrap:pretty">Stated so silence is not mistaken for coverage.</p>
+
+          <div style="display:grid;gap:12px;max-width:76ch;margin-bottom:36px">
+            <div style="background:#100E0A;border:1px solid rgba(233,165,68,.22);border-radius:12px;padding:17px 19px">
+              <div style="font:600 14px/1.3 Archivo,sans-serif;color:#E9A544;margin-bottom:8px">No deviation cap against a pool TWAP</div>
+              <div style="font:400 13.5px/1.65 Archivo,sans-serif;color:#9A8B72">A compromised feed within its staleness window mis-prices fees, bounded only by <span style="font-family:'JetBrains Mono',monospace">maxFeePips</span>. The threat model lists a cap as a mitigation; it is not implemented.</div>
+            </div>
+            <div style="background:#100E0A;border:1px solid rgba(233,165,68,.22);border-radius:12px;padding:17px 19px">
+              <div style="font:600 14px/1.3 Archivo,sans-serif;color:#E9A544;margin-bottom:8px">No pool allowlist in <span style="font-family:'JetBrains Mono',monospace">beforeInitialize</span></div>
+              <div style="font:400 13.5px/1.65 Archivo,sans-serif;color:#9A8B72">What exists instead is a currency-pair binding: the hook refuses any pool whose currencies do not match the pair its oracle declares. Both halves are covered by <span style="font-family:'JetBrains Mono',monospace">UnboundPool.t.sol</span>.</div>
+            </div>
+            <div style="background:#150E0C;border:1px solid rgba(228,103,79,.24);border-radius:12px;padding:17px 19px">
+              <div style="font:600 14px/1.3 Archivo,sans-serif;color:#E4674F;margin-bottom:8px">The adverse-selection gate does not pass</div>
+              <div style="font:400 13.5px/1.65 Archivo,sans-serif;color:#9A8480">The mechanism is implemented and deployed; the evidence that it improves LP outcomes is not established. See <span style="font-family:'JetBrains Mono',monospace">P0-GATE-RESULT.md</span>, which reports the failure and why, rather than the earlier claim it replaces.</div>
+            </div>
+          </div>
+
+          <h2 style="margin:0 0 14px;font:600 22px/1.25 Archivo,sans-serif;letter-spacing:-.02em">Anticipated attacks</h2>
+          <div style="border:1px solid rgba(233,236,239,.07);border-radius:12px;overflow:hidden;max-width:76ch;margin-bottom:32px">
+            <div style="display:grid;grid-template-columns:1.5fr 1.4fr 1fr;gap:14px;padding:11px 17px;background:#0A0B0C;border-bottom:1px solid rgba(233,236,239,.06);font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278">
+              <div>Attack</div><div>Mitigation</div><div>Test</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1.5fr 1.4fr 1fr;gap:14px;padding:13px 17px;background:#0E1011;border-bottom:1px solid rgba(233,236,239,.05);font:400 12.5px/1.5 Archivo,sans-serif;color:#9BA1A6">
+              <div>Hook attached to a foreign pool</div><div>Currency-pair binding, both halves</div><div style="font-family:'JetBrains Mono',monospace;font-size:11.5px">UnboundPool</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1.5fr 1.4fr 1fr;gap:14px;padding:13px 17px;background:#0E1011;border-bottom:1px solid rgba(233,236,239,.05);font:400 12.5px/1.5 Archivo,sans-serif;color:#9BA1A6">
+              <div>Unsettled delta bricking every swap</div><div><span style="font-family:'JetBrains Mono',monospace">donate</span> + returned delta net to zero</div><div style="font-family:'JetBrains Mono',monospace;font-size:11.5px">ToxicitySurchargeFlow</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1.5fr 1.4fr 1fr;gap:14px;padding:13px 17px;background:#0E1011;border-bottom:1px solid rgba(233,236,239,.05);font:400 12.5px/1.5 Archivo,sans-serif;color:#9BA1A6">
+              <div>Donation with zero in-range liquidity</div><div>Guarded and skipped</div><div style="font-family:'JetBrains Mono',monospace;font-size:11.5px">ToxicitySurchargeFlow</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1.5fr 1.4fr 1fr;gap:14px;padding:13px 17px;background:#0E1011;border-bottom:1px solid rgba(233,236,239,.05);font:400 12.5px/1.5 Archivo,sans-serif;color:#9BA1A6">
+              <div>Self-dealing: sole in-range LP recovers their own surcharge</div><div>Net cost (1−s)·S; degrades to neutral at s=1</div><div style="font-family:'JetBrains Mono',monospace;font-size:11.5px">SECURITY.md</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1.5fr 1.4fr 1fr;gap:14px;padding:13px 17px;background:#0E1011;border-bottom:1px solid rgba(233,236,239,.05);font:400 12.5px/1.5 Archivo,sans-serif;color:#9BA1A6">
+              <div>Oracle manipulation of the drift signal</div><div>Staleness bound, degrade to f_max. <span style="color:#E9A544">No deviation cap.</span></div><div style="font-family:'JetBrains Mono',monospace;font-size:11.5px">HostileOracle</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1.5fr 1.4fr 1fr;gap:14px;padding:13px 17px;background:#0E1011;font:400 12.5px/1.5 Archivo,sans-serif;color:#9BA1A6">
+              <div>Arithmetic overflow at type extremes</div><div>Written bounds proofs, fuzz at extremes</div><div style="font-family:'JetBrains Mono',monospace;font-size:11.5px">Q32x32, Estimators</div>
+            </div>
+          </div>
+          <p style="margin:0;font:400 13.5px/1.65 Archivo,sans-serif;color:#6B7278;max-width:70ch">Bunni, then the largest LP-optimisation hook on v4, was exploited for roughly $8.4M in September 2025 through a rounding flaw in liquidity distribution logic, despite audits. Rounding gets disproportionate attention here.</p>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isDocRemoved }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <h1 style="margin:0 0 18px;font:600 36px/1.15 Archivo,sans-serif;letter-spacing:-.03em">What is not built</h1>
+          <p style="margin:0 0 26px;font:400 16px/1.7 Archivo,sans-serif;color:#B7BCC0;max-width:70ch;text-wrap:pretty">The original design described a posterior probability over six microstructure signals, a rebate ledger, and router attestation. Most of that is not built, and the parts that were built and measured were removed rather than left to bill every swap for nothing.</p>
+
+          <h2 style="margin:0 0 14px;font:600 22px/1.25 Archivo,sans-serif;letter-spacing:-.02em">Measured and removed</h2>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:70ch;margin-bottom:20px">
+            <div style="background:#0E1011;border:1px solid rgba(233,236,239,.08);border-radius:12px;padding:17px 19px">
+              <div style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278;margin-bottom:11px">VarianceEwma</div>
+              <div style="font:500 22px/1 'JetBrains Mono',monospace;color:#E4674F;margin-bottom:9px">−0.008</div>
+              <div style="font:400 12.5px/1.55 Archivo,sans-serif;color:#9BA1A6">Incremental value over the reference signal alone. Library retained, pure and tested.</div>
+            </div>
+            <div style="background:#0E1011;border:1px solid rgba(233,236,239,.08);border-radius:12px;padding:17px 19px">
+              <div style="font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278;margin-bottom:11px">OrderFlowImbalance</div>
+              <div style="font:500 22px/1 'JetBrains Mono',monospace;color:#E4674F;margin-bottom:9px">−0.002</div>
+              <div style="font:400 12.5px/1.55 Archivo,sans-serif;color:#9BA1A6">Second independent window. Same conclusion, same treatment.</div>
+            </div>
+          </div>
+          <p style="margin:0 0 30px;font:400 13.5px/1.65 Archivo,sans-serif;color:#6B7278;max-width:70ch">Removing them changed the bytecode and therefore the mined CREATE2 address, which is why the earlier deployment at <span style="font-family:'JetBrains Mono',monospace">0x188FAc39…30C4</span> is superseded rather than upgraded.</p>
+
+          <h2 style="margin:0 0 14px;font:600 22px/1.25 Archivo,sans-serif;letter-spacing:-.02em">Contracts that do not exist</h2>
+          <div style="background:#0A0B0C;border:1px solid rgba(233,236,239,.08);border-radius:12px;padding:18px 20px;font:400 13px/2 'JetBrains Mono',monospace;color:#6B7278;max-width:70ch;overflow-x:auto">libraries/FeatureExtractor.sol<br>libraries/ToxicityScore.sol<br>libraries/FeeCurve.sol<br>model/Coefficients.sol<br>rebate/RebateLedger.sol<br>rebate/RouterAttestation.sol</div>
+          <p style="margin:16px 0 0;font:400 13.5px/1.65 Archivo,sans-serif;color:#6B7278;max-width:70ch">No posterior probability, no six-feature vector, no sigmoid, no ERC-6909 accounting, no EIP-712 attestation, no <span style="font-family:'JetBrains Mono',monospace">f*(v)</span> lookup table. The growth-optimal curve needs three parameters that have never been estimated from data, and inventing them would be worse than shipping a mechanism whose single parameter is honest.</p>
+        </div>
+      </sc-if>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:48px;padding-top:28px;border-top:1px solid rgba(233,236,239,.07)">
+        <button onClick="{{ docPrev }}" style="text-align:left;padding:15px 17px;border-radius:12px;background:#0E1011;border:1px solid rgba(233,236,239,.08);cursor:pointer" style-hover="border-color:rgba(233,236,239,.22)">
+          <span style="display:block;font:400 11px/1 'JetBrains Mono',monospace;color:#6B7278;margin-bottom:8px">← Previous</span>
+          <span style="display:block;font:600 13.5px/1.3 Archivo,sans-serif;color:#E7EAEC">{{ docPrevLabel }}</span>
+        </button>
+        <button onClick="{{ docNext }}" style="text-align:right;padding:15px 17px;border-radius:12px;background:#0E1011;border:1px solid rgba(233,236,239,.08);cursor:pointer" style-hover="border-color:rgba(233,236,239,.22)">
+          <span style="display:block;font:400 11px/1 'JetBrains Mono',monospace;color:#6B7278;margin-bottom:8px">Next →</span>
+          <span style="display:block;font:600 13.5px/1.3 Archivo,sans-serif;color:#E7EAEC">{{ docNextLabel }}</span>
+        </button>
+      </div>
+    </article>
+
+    <aside style="position:sticky;top:76px;padding:30px 0 40px">
+      <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#6B7278;margin-bottom:13px">On this page</div>
+      <sc-for list="{{ docToc }}" as="h" hint-placeholder-count="3">
+        <div style="padding:5px 0;font:400 12.5px/1.45 Archivo,sans-serif;color:#6B7278">{{ h.label }}</div>
+      </sc-for>
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid rgba(233,236,239,.07)">
+        <a href="https://sepolia.basescan.org/address/0xa3A9901c03bB63232abaA7493AA4a21b71B5b0c4" target="_blank" rel="noreferrer" style="display:block;font:400 12.5px/1.5 Archivo,sans-serif;margin-bottom:8px">View on Basescan ↗</a>
+        <span style="display:block;font:400 12px/1.5 'JetBrains Mono',monospace;color:#6B7278">MIT · v0.1.0-testnet</span>
+      </div>
+    </aside>
+
+  </main>
+  </sc-if>
+
+  <footer style="border-top:1px solid rgba(233,236,239,.07);padding:40px 24px 44px">
+    <div style="max-width:1240px;margin:0 auto;display:grid;grid-template-columns:1.6fr repeat(3,minmax(120px,1fr));gap:36px">
+      <div>
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:14px">
+          <img src="assets/assay-mark-light.svg" alt="" style="width:18px;height:18px;display:block;opacity:.7">
+          <span style="font:600 13.5px/1 Archivo,sans-serif;color:#9BA1A6">Assay</span>
+        </div>
+        <div style="font:400 12.5px/1.6 Archivo,sans-serif;color:#6B7278;max-width:40ch">A Uniswap v4 hook that prices adverse selection per swap. MIT licensed. Unaudited, and never having held value.</div>
+      </div>
+      <div style="display:grid;gap:9px;align-content:start">
+        <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:3px">Protocol</div>
+        <a href="https://sepolia.basescan.org/address/0xa3A9901c03bB63232abaA7493AA4a21b71B5b0c4" target="_blank" rel="noreferrer" style="font:400 12.5px/1 Archivo,sans-serif;color:#9BA1A6">Hook contract</a>
+        <a href="https://sepolia.basescan.org/address/0x68E65451A97261B451f186e9B9099c3fBF7efc90" target="_blank" rel="noreferrer" style="font:400 12.5px/1 Archivo,sans-serif;color:#9BA1A6">Oracle adapter</a>
+        <span style="font:400 12.5px/1 'JetBrains Mono',monospace;color:#6B7278">mask 0x30C4</span>
+      </div>
+      <div style="display:grid;gap:9px;align-content:start">
+        <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:3px">Evidence</div>
+        <span style="font:400 12.5px/1 Archivo,sans-serif;color:#9BA1A6">P0-GATE-RESULT.md</span>
+        <span style="font:400 12.5px/1 Archivo,sans-serif;color:#9BA1A6">SECURITY.md</span>
+        <span style="font:400 12.5px/1 Archivo,sans-serif;color:#9BA1A6">docs/gas.md</span>
+      </div>
+      <div style="display:grid;gap:9px;align-content:start">
+        <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:3px">Status</div>
+        <span style="font:400 12.5px/1 'JetBrains Mono',monospace;color:#E9A544">gate: not passing</span>
+        <span style="font:400 12.5px/1 'JetBrains Mono',monospace;color:#6B7278">base sepolia</span>
+        <span style="font:400 12.5px/1 'JetBrains Mono',monospace;color:#6B7278">v0.1.0-testnet</span>
+      </div>
+    </div>
+  </footer>
+
+  <sc-if value="{{ anyModal }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:fixed;inset:0;z-index:60;background:rgba(5,6,7,.72);backdrop-filter:blur(7px);display:flex;align-items:center;justify-content:center;padding:24px;animation:assayRise .18s ease">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" style="width:100%;max-width:{{ modalWidth }};max-height:82vh;overflow:auto;background:#0E1011;border:1px solid rgba(233,236,239,.11);border-radius:18px;box-shadow:0 40px 90px -30px rgba(0,0,0,.9);animation:assayRise .26s cubic-bezier(.22,1,.36,1)">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px 14px;border-bottom:1px solid rgba(233,236,239,.07)">
+          <span style="font:600 15.5px/1 Archivo,sans-serif">{{ modalTitle }}</span>
+          <button onClick="{{ closeModal }}" aria-label="Close" style="width:28px;height:28px;border-radius:7px;background:#151819;border:1px solid rgba(233,236,239,.08);cursor:pointer;color:#9BA1A6;font:400 13px/1 'JetBrains Mono',monospace" style-hover="color:#E7EAEC">✕</button>
+        </div>
+
+        <sc-if value="{{ isTokenModal }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="padding:14px 20px">
+              <input value="{{ tokenQuery }}" onChange="{{ onTokenQuery }}" placeholder="Search name or paste address" aria-label="Search tokens" style="width:100%;height:42px;padding:0 14px;border-radius:10px;background:#131617;border:1px solid rgba(233,236,239,.08);outline:none;color:#E7EAEC;font:400 13.5px/1 Archivo,sans-serif" style-focus="border-color:rgba(79,195,232,.45)">
+            </div>
+            <sc-if value="{{ hasTokens }}" hint-placeholder-val="{{ true }}">
+              <div style="padding:0 8px 14px">
+                <sc-for list="{{ tokenList }}" as="t" hint-placeholder-count="4">
+                  <button onClick="{{ t.pick }}" style="width:100%;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:11px 12px;border-radius:11px;background:none;border:0;cursor:pointer;text-align:left" style-hover="background:#151819">
+                    <span style="width:32px;height:32px;border-radius:50%;background:{{ t.color }};display:flex;align-items:center;justify-content:center;font:600 11px/1 'JetBrains Mono',monospace;color:#0A0B0C">{{ t.glyph }}</span>
+                    <span style="min-width:0">
+                      <span style="display:flex;align-items:center;gap:7px">
+                        <span style="font:600 14px/1.2 Archivo,sans-serif;color:#E7EAEC">{{ t.symbol }}</span>
+                        <span style="font:500 9.5px/1 'JetBrains Mono',monospace;padding:3px 5px;border-radius:4px;background:{{ t.badgeWash }};color:{{ t.badgeColor }}">{{ t.badge }}</span>
+                      </span>
+                      <span style="display:block;font:400 12px/1.3 Archivo,sans-serif;color:#6B7278;margin-top:3px">{{ t.name }}</span>
+                    </span>
+                    <span style="text-align:right">
+                      <span style="display:block;font:400 13px/1 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#E7EAEC">{{ t.balance }}</span>
+                      <span style="display:block;font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278;margin-top:5px">{{ t.usd }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ noTokens }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:44px 24px 52px;text-align:center">
+                <div style="width:40px;height:40px;margin:0 auto 16px;border-radius:11px;border:1px dashed rgba(233,236,239,.18)"></div>
+                <div style="font:600 14px/1.3 Archivo,sans-serif;color:#E7EAEC;margin-bottom:7px">No token matches “{{ tokenQuery }}”</div>
+                <div style="font:400 12.5px/1.55 Archivo,sans-serif;color:#6B7278;max-width:36ch;margin:0 auto">The hook refuses any pool whose currencies do not match the pair its oracle declares, so only bound pairs are listed here.</div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isWalletModal }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:16px 20px 20px">
+            <sc-if value="{{ disconnected }}" hint-placeholder-val="{{ true }}">
+              <div style="display:grid;gap:8px">
+                <sc-for list="{{ wallets }}" as="w" hint-placeholder-count="4">
+                  <button onClick="{{ w.connect }}" style="display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:13px 14px;border-radius:12px;background:#131617;border:1px solid rgba(233,236,239,.07);cursor:pointer;text-align:left" style-hover="border-color:rgba(233,236,239,.2);background:#151819">
+                    <span style="width:30px;height:30px;border-radius:8px;background:{{ w.color }};display:flex;align-items:center;justify-content:center;font:600 11px/1 'JetBrains Mono',monospace;color:#0A0B0C">{{ w.glyph }}</span>
+                    <span>
+                      <span style="display:block;font:600 13.5px/1.2 Archivo,sans-serif;color:#E7EAEC">{{ w.name }}</span>
+                      <span style="display:block;font:400 11.5px/1 Archivo,sans-serif;color:#6B7278;margin-top:4px">{{ w.note }}</span>
+                    </span>
+                    <span style="font:400 11px/1 'JetBrains Mono',monospace;color:#6B7278">{{ w.state }}</span>
+                  </button>
+                </sc-for>
+                <div style="margin-top:6px;font:400 11.5px/1.55 Archivo,sans-serif;color:#6B7278">Assay never takes custody of swap principal and holds no allowance beyond the router's. Connecting reads balances only.</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ connected }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <div style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;background:#131617;border:1px solid rgba(233,236,239,.07);margin-bottom:14px">
+                  <span style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#4FC3E8,#5BD08C)"></span>
+                  <span style="flex:1;min-width:0">
+                    <span style="display:block;font:500 14px/1 'JetBrains Mono',monospace;color:#E7EAEC">{{ addrShort }}</span>
+                    <span style="display:block;font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278;margin-top:5px">{{ walletValue }} · {{ netName }}</span>
+                  </span>
+                  <button onClick="{{ copyAddr }}" style="height:28px;padding:0 10px;border-radius:7px;background:#191C1E;border:1px solid rgba(233,236,239,.08);cursor:pointer;font:500 11.5px/1 'JetBrains Mono',monospace;color:{{ copyColor }}" style-hover="border-color:rgba(233,236,239,.22)">{{ copyLabel }}</button>
+                </div>
+                <div style="display:grid;gap:1px;background:rgba(233,236,239,.06);border:1px solid rgba(233,236,239,.06);border-radius:11px;overflow:hidden;margin-bottom:14px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;background:#0A0B0C;padding:11px 14px">
+                    <span style="font:400 12.5px/1 Archivo,sans-serif;color:#6B7278">Test ETH</span>
+                    <span style="font:400 12.5px/1 'JetBrains Mono',monospace;color:#9BA1A6">{{ balEth }}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;background:#0A0B0C;padding:11px 14px">
+                    <span style="font:400 12.5px/1 Archivo,sans-serif;color:#6B7278">Test USDC</span>
+                    <span style="font:400 12.5px/1 'JetBrains Mono',monospace;color:#9BA1A6">{{ balUsdc }}</span>
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px">
+                  <a href="https://sepolia.basescan.org/" target="_blank" rel="noreferrer" style="flex:1;height:38px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#151819;border:1px solid rgba(233,236,239,.08);font:600 12.5px/1 Archivo,sans-serif;color:#E7EAEC">Explorer ↗</a>
+                  <button onClick="{{ disconnect }}" style="flex:1;height:38px;border-radius:9px;background:#150E0C;border:1px solid rgba(228,103,79,.24);cursor:pointer;font:600 12.5px/1 Archivo,sans-serif;color:#E4674F" style-hover="border-color:rgba(228,103,79,.5)">Disconnect</button>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isNetworkModal }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:12px 12px 16px">
+            <sc-for list="{{ networks }}" as="n" hint-placeholder-count="4">
+              <button onClick="{{ n.pick }}" disabled="{{ n.disabled }}" style="width:100%;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px;border-radius:11px;background:none;border:0;cursor:{{ n.cursor }};text-align:left;opacity:{{ n.opacity }}" style-hover="background:#151819">
+                <span style="width:26px;height:26px;border-radius:7px;background:{{ n.color }}"></span>
+                <span>
+                  <span style="display:block;font:600 13.5px/1.2 Archivo,sans-serif;color:#E7EAEC">{{ n.name }}</span>
+                  <span style="display:block;font:400 11.5px/1 'JetBrains Mono',monospace;color:#6B7278;margin-top:4px">{{ n.note }}</span>
+                </span>
+                <span style="font:500 11px/1 'JetBrains Mono',monospace;color:{{ n.stateColor }}">{{ n.state }}</span>
+              </button>
+            </sc-for>
+            <div style="margin:8px 12px 0;font:400 11.5px/1.55 Archivo,sans-serif;color:#6B7278">The hook resolves its PoolManager from the chain id at deploy time, so a deployment pointed at the wrong network fails rather than binding to a contract that happens to exist.</div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isSettingsModal }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:18px 20px 20px">
+            <div style="font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#6B7278;margin-bottom:11px">Max slippage</div>
+            <div style="display:flex;gap:8px;margin-bottom:20px">
+              <button onClick="{{ slip0 }}" style="flex:1;height:36px;border-radius:9px;background:{{ slipBg0 }};border:1px solid {{ slipBd0 }};cursor:pointer;font:500 12.5px/1 'JetBrains Mono',monospace;color:{{ slipFg0 }}">0.10%</button>
+              <button onClick="{{ slip1 }}" style="flex:1;height:36px;border-radius:9px;background:{{ slipBg1 }};border:1px solid {{ slipBd1 }};cursor:pointer;font:500 12.5px/1 'JetBrains Mono',monospace;color:{{ slipFg1 }}">0.50%</button>
+              <button onClick="{{ slip2 }}" style="flex:1;height:36px;border-radius:9px;background:{{ slipBg2 }};border:1px solid {{ slipBd2 }};cursor:pointer;font:500 12.5px/1 'JetBrains Mono',monospace;color:{{ slipFg2 }}">1.00%</button>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:11px;padding:13px 14px;border-radius:11px;background:#0A0B0C;border:1px solid rgba(233,236,239,.07)">
+              <span style="width:6px;height:6px;border-radius:50%;background:#4FC3E8;flex:none;margin-top:5px"></span>
+              <div style="font:400 12.5px/1.55 Archivo,sans-serif;color:#9BA1A6">Slippage protects the amount you receive. It does not bound the hook's fee — that is bounded by <span style="font-family:'JetBrains Mono',monospace">feeBounds()</span> at 0.01%–1.00%, an invariant the fuzz suite asserts across 8,192-call sequences.</div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isSearchModal }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="padding:14px 20px">
+              <input value="{{ docQuery }}" onChange="{{ onDocQuery }}" placeholder="Search the protocol docs" aria-label="Search documentation" autoFocus="{{ true }}" style="width:100%;height:42px;padding:0 14px;border-radius:10px;background:#131617;border:1px solid rgba(233,236,239,.08);outline:none;color:#E7EAEC;font:400 13.5px/1 Archivo,sans-serif" style-focus="border-color:rgba(79,195,232,.45)">
+            </div>
+            <sc-if value="{{ hasDocHits }}" hint-placeholder-val="{{ true }}">
+              <div style="padding:0 8px 14px">
+                <sc-for list="{{ docHits }}" as="h" hint-placeholder-count="3">
+                  <button onClick="{{ h.pick }}" style="width:100%;display:block;text-align:left;padding:11px 12px;border-radius:11px;background:none;border:0;cursor:pointer" style-hover="background:#151819">
+                    <span style="display:flex;align-items:baseline;gap:8px">
+                      <span style="font:600 13.5px/1.2 Archivo,sans-serif;color:#E7EAEC">{{ h.label }}</span>
+                      <span style="font:400 10.5px/1 'JetBrains Mono',monospace;color:#6B7278">{{ h.group }}</span>
+                    </span>
+                    <span style="display:block;font:400 11.5px/1.4 'JetBrains Mono',monospace;color:#6B7278;margin-top:5px">{{ h.toc }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ noDocHits }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:40px 24px 48px;text-align:center">
+                <div style="font:600 14px/1.3 Archivo,sans-serif;margin-bottom:7px">Nothing matches “{{ docQuery }}”</div>
+                <div style="font:400 12.5px/1.55 Archivo,sans-serif;color:#6B7278;max-width:34ch;margin:0 auto">Six pages, all of them short. Try “overflow”, “invariant”, or “capture share”.</div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isTxModal }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:28px 24px 24px;text-align:center">
+            <sc-if value="{{ txPending }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <div style="width:52px;height:52px;margin:0 auto 20px;border-radius:50%;border:2px solid rgba(79,195,232,.18);border-top-color:#4FC3E8;animation:assaySpin .9s linear infinite"></div>
+                <div style="font:600 16px/1.3 Archivo,sans-serif;margin-bottom:8px">Submitting swap</div>
+                <div style="font:400 13px/1.55 Archivo,sans-serif;color:#9BA1A6;max-width:38ch;margin:0 auto 20px">The hook quotes inside <span style="font-family:'JetBrains Mono',monospace">beforeSwap</span>. The fee you were shown is the fee that will be charged unless the reference refreshes at the block boundary.</div>
+                <div style="font:400 12px/1 'JetBrains Mono',monospace;color:#6B7278">waiting for block {{ nextBlock }}</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ txDone }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <div style="position:relative;width:52px;height:52px;margin:0 auto 20px">
+                  <div style="position:absolute;inset:0;border-radius:50%;background:rgba(91,208,140,.16);animation:assayRipple 1.6s ease-out infinite"></div>
+                  <div style="position:absolute;inset:0;border-radius:50%;background:rgba(91,208,140,.12);display:flex;align-items:center;justify-content:center;color:#5BD08C;font:400 22px/1 'JetBrains Mono',monospace">✓</div>
+                </div>
+                <div style="font:600 16px/1.3 Archivo,sans-serif;margin-bottom:8px">Swap confirmed</div>
+                <div style="font:400 13px/1.55 Archivo,sans-serif;color:#9BA1A6;margin-bottom:20px">{{ txSummary }}</div>
+                <div style="display:grid;gap:1px;background:rgba(233,236,239,.06);border:1px solid rgba(233,236,239,.06);border-radius:11px;overflow:hidden;text-align:left;margin-bottom:16px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;background:#0A0B0C;padding:11px 14px">
+                    <span style="font:400 12px/1 'JetBrains Mono',monospace;color:#6B7278">SwapAssayed feePips</span>
+                    <span style="font:500 12px/1 'JetBrains Mono',monospace;color:{{ toneColor }}">{{ feePipsText }}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;background:#0A0B0C;padding:11px 14px">
+                    <span style="font:400 12px/1 'JetBrains Mono',monospace;color:#6B7278">gas used</span>
+                    <span style="font:500 12px/1 'JetBrains Mono',monospace;color:#9BA1A6">{{ txGas }}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;background:#0A0B0C;padding:11px 14px">
+                    <span style="font:400 12px/1 'JetBrains Mono',monospace;color:#6B7278">tx</span>
+                    <a href="https://sepolia.basescan.org/" target="_blank" rel="noreferrer" style="font:400 12px/1 'JetBrains Mono',monospace">{{ txHash }} ↗</a>
+                  </div>
+                </div>
+                <button onClick="{{ closeModal }}" style="width:100%;height:42px;border-radius:10px;background:#E7EAEC;border:0;cursor:pointer;font:600 13.5px/1 Archivo,sans-serif;color:#0A0B0C">Done</button>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1000},&quot;startRoute&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;home&quot;,&quot;swap&quot;,&quot;markets&quot;,&quot;docs&quot;],&quot;default&quot;:&quot;home&quot;,&quot;tsType&quot;:&quot;'home'|'swap'|'markets'|'docs'&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;dataMode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;base sepolia live&quot;,&quot;mainnet mock&quot;],&quot;default&quot;:&quot;base sepolia live&quot;,&quot;tsType&quot;:&quot;'base sepolia live'|'mainnet mock'&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;liveMarket&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;candour&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;foreground&quot;,&quot;understated&quot;],&quot;default&quot;:&quot;foreground&quot;,&quot;tsType&quot;:&quot;'foreground'|'understated'&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+const BASE_FEE = 500, MIN_FEE = 100, MAX_FEE = 10000, SHARE_BPS = 1000;
+const REF_PRICE = 3412.60;
+const TONE = {
+  benign: { c: '#5BD08C', wash: 'rgba(91,208,140,.06)', wash2: 'rgba(91,208,140,.10)', bd: 'rgba(91,208,140,.22)' },
+  base:   { c: '#4FC3E8', wash: 'rgba(79,195,232,.06)', wash2: 'rgba(79,195,232,.10)', bd: 'rgba(79,195,232,.22)' },
+  warm:   { c: '#E9A544', wash: 'rgba(233,165,68,.06)', wash2: 'rgba(233,165,68,.12)', bd: 'rgba(233,165,68,.24)' },
+  hot:    { c: '#E4674F', wash: 'rgba(228,103,79,.07)', wash2: 'rgba(228,103,79,.13)', bd: 'rgba(228,103,79,.26)' }
+};
+const TOKENS = {
+  ETH:  { symbol: 'ETH',  name: 'Ether',      color: '#C3C8D4', glyph: 'ETH', dec: 4, price: REF_PRICE, badge: 'native',   bal: 2.4813 },
+  USDC: { symbol: 'USDC', name: 'USD Coin',   color: '#6FB3E8', glyph: 'USDC', dec: 2, price: 1,        badge: 'verified', bal: 12840.22 },
+  tETH: { symbol: 'tETH', name: 'Test Ether (Base Sepolia)', color: '#C3C8D4', glyph: 'tETH', dec: 4, price: REF_PRICE, badge: 'testnet', bal: 5.0 },
+  tUSDC:{ symbol: 'tUSDC',name: 'Test USD Coin',color: '#6FB3E8', glyph: 'tUSD', dec: 2, price: 1,      badge: 'testnet', bal: 20000 }
+};
+
+const DOC_PAGES = [
+  { id: 'intro',   label: 'Introduction',      group: 'Getting started', toc: ['The problem', 'Deployment'] },
+  { id: 'mech',    label: 'The fee formula',   group: 'Protocol',        toc: ['Deployed parameters', 'Why 1,000 bps', 'The fee-cap overflow'] },
+  { id: 'v4',      label: 'v4 constraints',    group: 'Protocol',        toc: ['Permissions', 'Dynamic fee handshake', 'Hot path'] },
+  { id: 'inv',     label: 'Invariants',        group: 'Assurance',       toc: ['Live properties', 'Not applicable'] },
+  { id: 'risk',    label: 'Risk & known gaps', group: 'Assurance',       toc: ['Known gaps', 'Anticipated attacks'] },
+  { id: 'removed', label: 'What is not built', group: 'Assurance',       toc: ['Measured and removed', 'Contracts that do not exist'] }
+];
+const RANGES = [
+  { label: '1H', f: 1 / 24 }, { label: '1D', f: 1 }, { label: '1W', f: 6.4 },
+  { label: '1M', f: 26 }, { label: 'ALL', f: 71 }
+];
+
+class Component extends DCLogic {
+  state = {
+    route: 'home', drift: 24, live: true, fresh: true, connected: false,
+    modal: null, tokenQuery: '', amountIn: '1.5', inKey: 'tETH', outKey: 'tUSDC',
+    mainnetMode: false, slip: 1, copied: false, block: 21486301, tx: null,
+    docPage: 'intro', docQuery: '', range: '1D'
+  };
+
+  componentDidMount() {
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    if (reduce) this.setState({ live: false });
+    this.onKey = e => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        this.setState({ route: 'docs', modal: 'search', docQuery: '' });
+      } else if (e.key === 'Escape') {
+        this.setState({ modal: null, tx: null });
+      }
+    };
+    window.addEventListener('keydown', this.onKey);
+    this.applyProps({});
+    this.blockTimer = setInterval(() => {
+      this.setState(s => ({ block: s.block + 1 }));
+      if (this.state.live) this.walk();
+    }, 2200);
+  }
+  componentWillUnmount() {
+    clearInterval(this.blockTimer);
+    if (this.raf) clearTimeout(this.raf);
+    window.removeEventListener('keydown', this.onKey);
+  }
+
+  applyProps(prev) {
+    const p = this.props, next = {};
+    if (p.startRoute && p.startRoute !== prev.startRoute) next.route = p.startRoute;
+    if (p.liveMarket !== undefined && p.liveMarket !== prev.liveMarket) next.live = !!p.liveMarket;
+    if (p.dataMode !== undefined && p.dataMode !== prev.dataMode) {
+      const big = p.dataMode === 'mainnet mock';
+      next.mainnetMode = big;
+      next.inKey = big ? 'ETH' : 'tETH';
+      next.outKey = big ? 'USDC' : 'tUSDC';
+    }
+    if (Object.keys(next).length) this.setState(next);
+  }
+  componentDidUpdate(prevProps) { if (prevProps !== this.props) this.applyProps(prevProps || {}); }
+
+  walk() {
+    this.setState(s => {
+      let d = s.drift + Math.round((Math.random() - 0.45) * 26);
+      if (d > 320) d = 320 - Math.random() * 40;
+      if (d < -140) d = -140 + Math.random() * 40;
+      return { drift: Math.round(d) };
+    });
+  }
+
+  // --- mechanism, mirroring FeeBlend.sol -----------------------------------
+  rawPips(drift) {
+    const scaled = drift * 100 * SHARE_BPS;
+    let sur = Math.trunc(scaled / 10000);
+    if (scaled > 0 && scaled % 10000 !== 0) sur += 1;
+    return BASE_FEE + sur;
+  }
+  quote(drift, fresh) {
+    if (!fresh) return MAX_FEE;
+    const raw = this.rawPips(drift);
+    return Math.min(MAX_FEE, Math.max(MIN_FEE, raw));
+  }
+  overflow(drift, fresh) {
+    if (!fresh) return 0;
+    return Math.max(0, Math.min(1000000, this.rawPips(drift) - MAX_FEE));
+  }
+
+  tone(drift, fresh) {
+    if (!fresh) return TONE.hot;
+    if (drift < 0) return TONE.benign;
+    if (drift <= 40) return TONE.base;
+    if (drift <= 500) return TONE.warm;
+    return TONE.hot;
+  }
+  toneLabel(drift, fresh) {
+    if (!fresh) return 'Reference stale — quoting the ceiling';
+    if (drift < 0) return 'Trades away from reference — below base';
+    if (drift <= 2) return 'At reference — base fee';
+    if (drift <= 40) return 'Slight drift — modest surcharge';
+    if (drift <= 500) return 'Captures drift — surcharged';
+    return 'Top-of-block capture — near the ceiling';
+  }
+
+  // --- drag handling -------------------------------------------------------
+  dragFrom(rect, clientX, min, max) {
+    const t = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    return Math.round(min + t * (max - min));
+  }
+  startDrag(e, min, max) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const move = ev => this.setState({ drift: this.dragFrom(rect, ev.clientX, min, max), live: false });
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+    move(e);
+  }
+
+  fmt(n, d) { return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+  usd(n) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  tokenSet() {
+    return this.state.mainnetMode ? ['ETH', 'USDC'] : ['tETH', 'tUSDC'];
+  }
+
+  renderVals() {
+    const s = this.state;
+    const drift = s.drift, fresh = s.fresh;
+    const fee = this.quote(drift, fresh);
+    const raw = this.rawPips(drift);
+    const of = this.overflow(drift, fresh);
+    const tone = this.tone(drift, fresh);
+    const twinFee = this.quote(-Math.abs(drift), fresh && true);
+    const twin = -Math.abs(drift);
+
+    const inT = TOKENS[s.inKey], outT = TOKENS[s.outKey];
+    const amtIn = parseFloat(s.amountIn) || 0;
+    const poolPrice = REF_PRICE / Math.pow(1.0001, drift);
+    const rate = inT.price === 1 ? 1 / poolPrice : poolPrice;
+    const grossOut = amtIn * rate;
+    const netOut = grossOut * (1 - fee / 1000000);
+    const insufficient = amtIn > inT.bal;
+    const slipPct = [0.001, 0.005, 0.01][s.slip];
+
+    // curve geometry: x maps drift -200..1200 over 0..1000, y maps 0..11000 pips
+    const gx = d => Math.max(0, Math.min(1000, (Math.min(1200, Math.max(-200, d)) + 200) / 1400 * 1000));
+    const gy = p => 340 - (p / 11000) * 340;
+    const meterPct = ((Math.min(1200, Math.max(-300, drift)) + 300) / 1500 * 100);
+
+    const pick = k => () => this.setState(st => (st.modal === 'tokenIn' ? { inKey: k, modal: null } : { outKey: k, modal: null }));
+    const tokenList = this.tokenSet()
+      .filter(k => !s.tokenQuery || (k + TOKENS[k].name).toLowerCase().includes(s.tokenQuery.toLowerCase()))
+      .map(k => {
+        const t = TOKENS[k];
+        const testnet = t.badge === 'testnet';
+        return {
+          symbol: t.symbol, name: t.name, color: t.color, glyph: t.glyph, badge: t.badge,
+          badgeWash: testnet ? 'rgba(233,165,68,.14)' : 'rgba(91,208,140,.14)',
+          badgeColor: testnet ? '#E9A544' : '#5BD08C',
+          balance: this.fmt(t.bal, t.dec), usd: this.usd(t.bal * t.price), pick: pick(k)
+        };
+      });
+
+    const events = [
+      { name: 'SwapAssayed', color: tone.c, wash: tone.wash2, args: 'feePips ' + fee + ' · sender 0x2Cf1…9dA4 (router)', when: 'block ' + s.block },
+      { name: 'SwapAssayed', color: '#5BD08C', wash: 'rgba(91,208,140,.12)', args: 'feePips ' + twinFee + ' · sender 0x7B90…41Ce (router)', when: 'block ' + s.block },
+      { name: of > 0 ? 'ToxicitySurchargeDonated' : 'ReferenceFreshnessChanged',
+        color: of > 0 ? '#E9A544' : '#9BA1A6', wash: of > 0 ? 'rgba(233,165,68,.12)' : 'rgba(233,236,239,.07)',
+        args: of > 0 ? 'amount ' + this.fmt(of / 1000000 * grossOut, 4) + ' · inCurrency0 false' : 'fresh true · transition only, not per swap',
+        when: 'block ' + (s.block - 1) },
+      { name: 'PoolRegistered', color: '#9BA1A6', wash: 'rgba(233,236,239,.07)', args: 'baseFeePips 500 · poolId 0x9c4e…af12', when: 'genesis' }
+    ];
+
+    const slipStyles = {};
+    [0, 1, 2].forEach(i => {
+      const on = s.slip === i;
+      slipStyles['slipBg' + i] = on ? 'rgba(79,195,232,.12)' : '#131617';
+      slipStyles['slipBd' + i] = on ? 'rgba(79,195,232,.4)' : 'rgba(233,236,239,.08)';
+      slipStyles['slipFg' + i] = on ? '#4FC3E8' : '#9BA1A6';
+    });
+
+    const modalTitles = { tokenIn: 'Select a token to pay', tokenOut: 'Select a token to receive', wallet: s.connected ? 'Wallet' : 'Connect a wallet', network: 'Network', settings: 'Transaction settings', tx: s.tx === 'done' ? 'Confirmed' : 'Pending', search: 'Search documentation' };
+
+    let ctaLabel = 'Connect wallet', ctaBg = '#E7EAEC', ctaFg = '#0A0B0C', ctaDisabled = false;
+    if (s.connected) {
+      if (amtIn <= 0) { ctaLabel = 'Enter an amount'; ctaBg = '#151819'; ctaFg = '#6B7278'; ctaDisabled = true; }
+      else if (insufficient) { ctaLabel = 'Insufficient ' + inT.symbol + ' balance'; ctaBg = '#150E0C'; ctaFg = '#E4674F'; ctaDisabled = true; }
+      else if (!fresh) { ctaLabel = 'Swap at the 1.00% ceiling'; ctaBg = '#E9A544'; ctaFg = '#0A0B0C'; }
+      else { ctaLabel = 'Swap ' + inT.symbol + ' for ' + outT.symbol; }
+    }
+
+    const candour = this.props.candour || 'foreground';
+
+    return {
+      loudBanner: candour === 'foreground', quietBanner: candour !== 'foreground',
+      // routing
+      isHome: s.route === 'home', isSwap: s.route === 'swap', isMarkets: s.route === 'markets', isDocs: s.route === 'docs',
+      goHome: () => this.setState({ route: 'home' }), goSwap: () => this.setState({ route: 'swap' }),
+      goMarkets: () => this.setState({ route: 'markets' }), goDocs: () => this.setState({ route: 'docs' }),
+      navHome: s.route === 'home' ? '#E7EAEC' : '#9BA1A6', navSwap: s.route === 'swap' ? '#E7EAEC' : '#9BA1A6',
+      navMarkets: s.route === 'markets' ? '#E7EAEC' : '#9BA1A6', navDocs: s.route === 'docs' ? '#E7EAEC' : '#9BA1A6',
+
+      // header
+      modeLabel: s.mainnetMode ? 'mainnet mock' : 'base sepolia live',
+      modeDot: s.mainnetMode ? '#E9A544' : '#5BD08C',
+      toggleDataMode: () => this.setState(st => ({ mainnetMode: !st.mainnetMode, inKey: st.mainnetMode ? 'tETH' : 'ETH', outKey: st.mainnetMode ? 'tUSDC' : 'USDC' })),
+      netName: 'Base Sepolia', netColor: '#3B6BF5',
+      connected: s.connected, disconnected: !s.connected,
+      addrShort: '0x8A3F…2F91', walletValue: this.usd(TOKENS[this.tokenSet()[0]].bal * REF_PRICE + TOKENS[this.tokenSet()[1]].bal),
+      balEth: this.fmt(TOKENS[this.tokenSet()[0]].bal, 4) + ' ' + TOKENS[this.tokenSet()[0]].symbol,
+      balUsdc: this.fmt(TOKENS[this.tokenSet()[1]].bal, 2) + ' ' + TOKENS[this.tokenSet()[1]].symbol,
+
+      // mechanism readouts
+      driftSigned: (drift > 0 ? '+' : '') + drift.toLocaleString('en-US'),
+      driftAbs: Math.abs(drift).toLocaleString('en-US'),
+      feePipsText: fee.toLocaleString('en-US'),
+      rawPipsText: raw.toLocaleString('en-US') + ' pips',
+      surchargeText: (raw - BASE_FEE >= 0 ? '+' : '') + (raw - BASE_FEE).toLocaleString('en-US'),
+      feeBpText: (fee / 100).toFixed(2) + ' bp',
+      twinBpText: (twinFee / 100).toFixed(2) + ' bp',
+      spreadText: ((fee - twinFee) / 100).toFixed(2) + ' bp',
+      feePctText: (fee / 10000).toFixed(4) + '%',
+      hasOverflow: of > 0, overflowText: of.toLocaleString('en-US'),
+      toneColor: tone.c, toneWash: tone.wash, toneWash2: tone.wash2, toneBorder: tone.bd,
+      toneLabel: this.toneLabel(drift, fresh),
+      dirLabel: drift >= 0 ? 'This swap · capturing' : 'This swap · trading away',
+      twinDirLabel: 'Opposite direction',
+
+      // curve + meter
+      markX: gx(drift), markY: gy(fee), markPct: (gx(drift) / 10).toFixed(2) + '%',
+      twinX: gx(twin), twinY: gy(twinFee),
+      meterPct: meterPct.toFixed(2) + '%',
+      meterFillLeft: (drift >= 0 ? 20 : meterPct).toFixed(2) + '%',
+      meterFillWidth: Math.abs(meterPct - 20).toFixed(2) + '%',
+      curveDown: e => this.startDrag(e, -200, 1200),
+      meterDown: e => this.startDrag(e, -300, 1200),
+      preset0: () => this.setState({ drift: 0, live: false }),
+      preset1: () => this.setState({ drift: -18, live: false }),
+      preset2: () => this.setState({ drift: 240, live: false }),
+      preset3: () => this.setState({ drift: 1080, live: false }),
+      toggleLive: () => this.setState(st => ({ live: !st.live })),
+      liveDot: s.live ? '#5BD08C' : '#6B7278', liveLabel: s.live ? 'live market' : 'paused',
+
+      // swap card
+      blockNum: s.block.toLocaleString('en-US'), nextBlock: (s.block + 1).toLocaleString('en-US'),
+      amountIn: s.amountIn, onAmountIn: e => this.setState({ amountIn: e.target.value.replace(/[^0-9.]/g, '') }),
+      amountInUsd: this.usd(amtIn * inT.price),
+      amountOut: amtIn > 0 ? this.fmt(netOut, outT.dec) : '0.00',
+      amountOutUsd: this.usd(netOut * outT.price),
+      outColor: amtIn > 0 ? '#E7EAEC' : '#3A3F42',
+      inTokenSymbol: inT.symbol, inTokenColor: inT.color, inTokenGlyph: inT.glyph,
+      outTokenSymbol: outT.symbol, outTokenColor: outT.color, outTokenGlyph: outT.glyph,
+      inBalance: this.fmt(inT.bal, inT.dec), outBalance: this.fmt(outT.bal, outT.dec),
+      setHalf: () => this.setState({ amountIn: (inT.bal / 2).toFixed(inT.dec) }),
+      setMax: () => this.setState({ amountIn: inT.bal.toFixed(inT.dec) }),
+      flipDirection: () => this.setState(st => ({ inKey: st.outKey, outKey: st.inKey, amountIn: '1.5' })),
+      rateText: '1 ' + inT.symbol + ' = ' + this.fmt(rate, rate > 100 ? 2 : 6) + ' ' + outT.symbol,
+      minReceived: this.fmt(netOut * (1 - slipPct), outT.dec) + ' ' + outT.symbol,
+      networkFee: s.mainnetMode ? '$1.84' : '$0.0021',
+      hookGas: fresh ? (of > 0 ? '48,582' : '14,572') : '30,901',
+      oracleLabel: s.mainnetMode ? 'Chainlink ETH/USD · cached' : '0x68E65451…F7efc90 · cached',
+      tickPair: (Math.round(Math.log(poolPrice) / Math.log(1.0001)) - 200000).toLocaleString('en-US') + ' / ' + (Math.round(Math.log(REF_PRICE) / Math.log(1.0001)) - 200000).toLocaleString('en-US'),
+      freshDot: fresh ? '#5BD08C' : '#E9A544',
+      freshText: fresh ? 'reference fresh · refreshed at most once per block' : 'reference stale · degrading to maxFeePips',
+      toggleFresh: () => this.setState(st => ({ fresh: !st.fresh })),
+      showError: s.connected && (insufficient || !fresh),
+      errorTitle: insufficient ? 'Insufficient balance' : 'Reference price is stale',
+      errorBody: insufficient
+        ? 'You are trying to pay ' + this.fmt(amtIn, inT.dec) + ' ' + inT.symbol + ' but hold ' + this.fmt(inT.bal, inT.dec) + '. Reduce the amount, or use MAX.'
+        : 'The oracle has not produced a usable reading inside its staleness bound, so the hook cannot tell which flow it is facing. It quotes the 1.00% ceiling rather than reverting — the conservative direction. Wait for the next feed update, or swap knowing the ceiling applies.',
+      ctaLabel, ctaBg, ctaFg, ctaDisabled, ctaCursor: ctaDisabled ? 'not-allowed' : 'pointer',
+      submit: () => {
+        if (!s.connected) return this.setState({ modal: 'wallet' });
+        if (ctaDisabled) return;
+        this.setState({ modal: 'tx', tx: 'pending' });
+        this.raf = setTimeout(() => this.setState({ tx: 'done' }), 2100);
+      },
+      events, eventCount: '4 recent',
+
+      // modals
+      anyModal: !!s.modal, modalTitle: modalTitles[s.modal] || '',
+      modalWidth: s.modal === 'tx' ? '420px' : s.modal === 'settings' ? '420px' : '440px',
+      isTokenModal: s.modal === 'tokenIn' || s.modal === 'tokenOut',
+      isWalletModal: s.modal === 'wallet', isNetworkModal: s.modal === 'network',
+      isSettingsModal: s.modal === 'settings', isTxModal: s.modal === 'tx',
+      txPending: s.tx === 'pending', txDone: s.tx === 'done',
+      txSummary: this.fmt(amtIn, inT.dec) + ' ' + inT.symbol + ' → ' + this.fmt(netOut, outT.dec) + ' ' + outT.symbol,
+      txGas: fresh ? '132,418' : '148,747', txHash: '0x4b17…c9e2',
+      closeModal: () => this.setState({ modal: null, tx: null }), stop: e => e.stopPropagation(),
+      openTokenIn: () => this.setState({ modal: 'tokenIn', tokenQuery: '' }),
+      openTokenOut: () => this.setState({ modal: 'tokenOut', tokenQuery: '' }),
+      openWallet: () => this.setState({ modal: 'wallet' }), openNetworks: () => this.setState({ modal: 'network' }),
+      openSettings: () => this.setState({ modal: 'settings' }),
+      tokenQuery: s.tokenQuery, onTokenQuery: e => this.setState({ tokenQuery: e.target.value }),
+      tokenList, hasTokens: tokenList.length > 0, noTokens: tokenList.length === 0,
+      wallets: [
+        { name: 'Browser wallet', note: 'Injected provider', glyph: 'BR', color: '#C3C8D4', state: 'detected', connect: () => this.setState({ connected: true, modal: null }) },
+        { name: 'WalletConnect', note: 'Scan with any mobile wallet', glyph: 'WC', color: '#6FB3E8', state: '', connect: () => this.setState({ connected: true, modal: null }) },
+        { name: 'Coinbase Wallet', note: 'Extension or smart wallet', glyph: 'CB', color: '#5B8CF5', state: '', connect: () => this.setState({ connected: true, modal: null }) },
+        { name: 'Safe', note: 'Multisig via WalletConnect', glyph: 'SF', color: '#5BD08C', state: '', connect: () => this.setState({ connected: true, modal: null }) }
+      ],
+      disconnect: () => this.setState({ connected: false, modal: null }),
+      copyAddr: () => { this.setState({ copied: true }); setTimeout(() => this.setState({ copied: false }), 1400); },
+      copyLabel: s.copied ? '✓ copied' : 'copy', copyColor: s.copied ? '#5BD08C' : '#9BA1A6',
+      networks: [
+        { name: 'Base Sepolia', note: 'chain 84532 · hook deployed here', color: '#3B6BF5', state: 'connected', stateColor: '#5BD08C', pick: () => this.setState({ modal: null }), disabled: false, cursor: 'pointer', opacity: '1' },
+        { name: 'Unichain Sepolia', note: 'chain 1301 · no Chainlink feed', color: '#E86FA8', state: 'no reference', stateColor: '#E9A544', pick: () => {}, disabled: true, cursor: 'not-allowed', opacity: '.5' },
+        { name: 'Ethereum', note: 'chain 1 · not deployed', color: '#8A93C6', state: 'unavailable', stateColor: '#6B7278', pick: () => {}, disabled: true, cursor: 'not-allowed', opacity: '.5' },
+        { name: 'Arbitrum', note: 'chain 42161 · not deployed', color: '#5B9CD6', state: 'unavailable', stateColor: '#6B7278', pick: () => {}, disabled: true, cursor: 'not-allowed', opacity: '.5' }
+      ],
+      slip0: () => this.setState({ slip: 0 }), slip1: () => this.setState({ slip: 1 }), slip2: () => this.setState({ slip: 2 }),
+      ...slipStyles,
+      ...this.marketVals(), ...this.docVals()
+    };
+  }
+
+  marketVals() {
+    const s = this.state, big = s.mainnetMode;
+    const f = (RANGES.find(r => r.label === s.range) || RANGES[1]).f;
+    const compact = n => n >= 1e6 ? '$' + (n / 1e6).toFixed(2) + 'M' : n >= 1e3 ? '$' + (n / 1e3).toFixed(1) + 'K' : '$' + n.toFixed(2);
+    const vol = (big ? 8.2e6 : 184200) * f;
+    const fees = (big ? 5742 : 128.94) * f;
+    const swaps = Math.round((big ? 18412 : 412) * f);
+    return {
+      ranges: RANGES.map(r => {
+        const on = r.label === s.range;
+        return {
+          label: r.label, pick: () => this.setState({ range: r.label }),
+          bg: on ? 'rgba(79,195,232,.12)' : '#101214',
+          bd: on ? 'rgba(79,195,232,.4)' : 'rgba(233,236,239,.08)',
+          fg: on ? '#4FC3E8' : '#9BA1A6'
+        };
+      }),
+      mTvl: big ? '$42.61M' : '$1.24M',
+      mTvlChange: big ? '+2.14% 24h' : '+0.82% 24h',
+      mVol: compact(vol), mFees: compact(fees),
+      mSwaps: swaps.toLocaleString('en-US'),
+      mDonated: compact((big ? 1284 : 41.18) * f),
+      mMeanFee: (big ? '7.00' : '7.02') + ' bp',
+      mUptime: big ? '99.94%' : '99.20%',
+      mStaleSpans: big ? '2 stale spans' : '3 stale spans',
+      mPair: big ? 'ETH / USDC' : 'tETH / tUSDC',
+      mChain: big ? 'Ethereum · chain 1 · mock' : 'Base Sepolia · chain 84532',
+      mRangeStart: '−' + s.range.replace('ALL', '71D')
+    };
+  }
+
+  docVals() {
+    const s = this.state;
+    const idx = Math.max(0, DOC_PAGES.findIndex(p => p.id === s.docPage));
+    const cur = DOC_PAGES[idx];
+    const prev = DOC_PAGES[(idx - 1 + DOC_PAGES.length) % DOC_PAGES.length];
+    const next = DOC_PAGES[(idx + 1) % DOC_PAGES.length];
+    const nav = [];
+    let group = null;
+    DOC_PAGES.forEach(p => {
+      if (p.group !== group) { group = p.group; nav.push({ isHeading: true, isLink: false, label: p.group }); }
+      const on = p.id === s.docPage;
+      nav.push({
+        isHeading: false, isLink: true, label: p.label,
+        pick: () => this.setState({ docPage: p.id }),
+        bg: on ? 'rgba(79,195,232,.07)' : 'transparent',
+        bar: on ? '#4FC3E8' : 'transparent',
+        fg: on ? '#E7EAEC' : '#9BA1A6',
+        weight: on ? '600' : '400'
+      });
+    });
+    const hits = DOC_PAGES.filter(p => !s.docQuery || (p.label + ' ' + p.toc.join(' ')).toLowerCase().includes(s.docQuery.toLowerCase()));
+    return {
+      docNav: nav, docCrumb: cur.label,
+      docToc: cur.toc.map(t => ({ label: t })),
+      isDocIntro: cur.id === 'intro', isDocMech: cur.id === 'mech', isDocV4: cur.id === 'v4',
+      isDocInv: cur.id === 'inv', isDocRisk: cur.id === 'risk', isDocRemoved: cur.id === 'removed',
+      docPrevLabel: prev.label, docNextLabel: next.label,
+      docPrev: () => this.setState({ docPage: prev.id }), docNext: () => this.setState({ docPage: next.id }),
+      openSearch: () => this.setState({ modal: 'search', docQuery: '' }),
+      isSearchModal: s.modal === 'search',
+      docQuery: s.docQuery, onDocQuery: e => this.setState({ docQuery: e.target.value }),
+      docHits: hits.map(p => ({
+        label: p.label, group: p.group, toc: p.toc.join(' · '),
+        pick: () => this.setState({ docPage: p.id, modal: null })
+      })),
+      hasDocHits: hits.length > 0, noDocHits: hits.length === 0
+    };
+  }
+}
+
+</script>
+</body>
+</html>

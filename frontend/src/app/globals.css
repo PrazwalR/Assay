@@ -1,0 +1,199 @@
+@import "tailwindcss";
+
+/*
+  Design tokens from frontend/DESIGN-SPEC.md §2–§5.
+
+  The spec was written against Tailwind v3 (`tailwind.config.ts → theme.extend.colors`).
+  Tailwind v4 is CSS-first, so the tokens live here instead, under the same semantic names --
+  `bg-surface`, `text-accent`, `border-border-hover` all resolve exactly as the spec intends.
+  The rule that matters is unchanged: no raw hex in components.
+
+  Dark is the only built theme (spec §2), so there is no prefers-color-scheme block and no
+  light palette. A single committed look, painted explicitly.
+*/
+@theme {
+  /* Surfaces, back to front */
+  --color-bg: #0a0b0c;
+  --color-surface: #0e1011;
+  --color-surface-2: #101214;
+  --color-surface-3: #131617;
+  --color-surface-4: #151819;
+  --color-surface-5: #191c1e;
+
+  /* Separation. Elevation is used twice in the whole app (spec §4); everything
+     else separates with one of these or a 1px grid gap. */
+  --color-border: rgb(233 236 239 / 0.07);
+  --color-border-2: rgb(233 236 239 / 0.09);
+  --color-border-hover: rgb(233 236 239 / 0.22);
+
+  /* Text, brightest to dimmest */
+  --color-text: #e7eaec;
+  --color-text-2: #b7bcc0;
+  --color-text-dim: #9ba1a6;
+  --color-text-muted: #6b7278;
+  --color-text-ghost: #3a3f42;
+
+  /* Accent is RESERVED (spec §2): quote-surface curve, base-fee state, links, focus
+     rings, the AssayHook node in the route, active nav/tab indicators. Nothing else.
+     Neutrals carry the rest of the interface. */
+  --color-accent: #4fc3e8;
+  --color-accent-hover: #8ad9f2;
+
+  /* Quote tones. Which one applies is a function of signed drift -- see
+     lib/protocol/tone.ts, which is the single source of that mapping. */
+  --color-benign: #5bd08c;
+  --color-warm: #e9a544;
+  --color-hot: #e4674f;
+
+  --font-sans: var(--font-archivo), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+/* Tone washes and borders. Kept as plain custom properties rather than @theme colours
+   because they are only ever consumed through the `data-tone` attribute below, never as
+   standalone utilities -- registering them would add a dozen utilities nothing calls. */
+:root {
+  --tone-benign: #5bd08c;
+  --tone-benign-wash: rgb(91 208 140 / 0.06);
+  --tone-benign-wash-2: rgb(91 208 140 / 0.1);
+  --tone-benign-border: rgb(91 208 140 / 0.22);
+
+  --tone-base: #4fc3e8;
+  --tone-base-wash: rgb(79 195 232 / 0.06);
+  --tone-base-wash-2: rgb(79 195 232 / 0.1);
+  --tone-base-border: rgb(79 195 232 / 0.22);
+
+  --tone-warm: #e9a544;
+  --tone-warm-wash: rgb(233 165 68 / 0.06);
+  --tone-warm-wash-2: rgb(233 165 68 / 0.12);
+  --tone-warm-border: rgb(233 165 68 / 0.24);
+
+  --tone-hot: #e4674f;
+  --tone-hot-wash: rgb(228 103 79 / 0.07);
+  --tone-hot-wash-2: rgb(228 103 79 / 0.13);
+  --tone-hot-border: rgb(228 103 79 / 0.26);
+}
+
+/*
+  A `data-tone` attribute anywhere resolves the four --tone-* variables for its whole
+  subtree. Components then reference `var(--tone)` / `var(--tone-wash)` without knowing
+  which tone is active, so the drift→tone mapping stays in one place and a component
+  never re-derives it.
+*/
+[data-tone="benign"] {
+  --tone: var(--tone-benign);
+  --tone-wash: var(--tone-benign-wash);
+  --tone-wash-2: var(--tone-benign-wash-2);
+  --tone-border: var(--tone-benign-border);
+}
+[data-tone="base"] {
+  --tone: var(--tone-base);
+  --tone-wash: var(--tone-base-wash);
+  --tone-wash-2: var(--tone-base-wash-2);
+  --tone-border: var(--tone-base-border);
+}
+[data-tone="warm"] {
+  --tone: var(--tone-warm);
+  --tone-wash: var(--tone-warm-wash);
+  --tone-wash-2: var(--tone-warm-wash-2);
+  --tone-border: var(--tone-warm-border);
+}
+[data-tone="hot"] {
+  --tone: var(--tone-hot);
+  --tone-wash: var(--tone-hot-wash);
+  --tone-wash-2: var(--tone-hot-wash-2);
+  --tone-border: var(--tone-hot-border);
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+/* Every number a user could act on is mono and tabular (spec §3). This is the class
+   that guarantee is expressed through. */
+.tnum {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--color-accent-hover);
+}
+
+::selection {
+  background: rgb(79 195 232 / 0.25);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Motion (spec §5). Names match the prototype so the two can be compared directly. */
+@keyframes assayPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes assaySpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes assayRise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes assayRipple {
+  from {
+    transform: scale(0.6);
+    opacity: 0.55;
+  }
+  to {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+@keyframes assayFlow {
+  from {
+    stroke-dashoffset: 240;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/*
+  Spec §5: all motion sits inside this query. The live-market random walk is additionally
+  suppressed in JS (useReducedMotion), because stopping a setInterval is not something CSS
+  can do -- a paused animation on a value that keeps changing is still motion.
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
