@@ -35,4 +35,18 @@ interface IAssayEvents {
     /// @param amount The amount donated, in the swap's unspecified currency.
     /// @param inCurrency0 Whether that currency was `key.currency0`.
     event ToxicitySurchargeDonated(PoolId indexed poolId, uint256 amount, bool inCurrency0);
+
+    /// @notice Emitted when the reference source reported a usable reading, but it was
+    ///         rejected for disagreeing with the pool's own smoothed tick by more than the
+    ///         configured cap. The pool is treated as if the reference were stale.
+    /// @dev Distinct from `ReferenceFreshnessChanged` so an operator can tell "the feed went
+    ///      dark" apart from "the feed answered, but this hook does not believe it" -- the
+    ///      second is the more actionable one to page someone about.
+    /// @param poolId The pool whose reference was rejected.
+    /// @param referenceTick The rejected reading.
+    /// @param twapTick The pool's own smoothed tick it was checked against.
+    /// @param maxDeviationTicks The configured cap that was exceeded.
+    event ReferenceDeviationCapTripped(
+        PoolId indexed poolId, int24 referenceTick, int24 twapTick, uint24 maxDeviationTicks
+    );
 }

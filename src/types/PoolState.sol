@@ -8,11 +8,12 @@ pragma solidity 0.8.26;
 ///        int24  referenceTick   24    cached reference price, refreshed once per period
 ///        uint32 lastBlock       32    block number the current period belongs to
 ///        bool   referenceFresh   8    whether the cached reference is usable
+///        int64  twapTickX32     64    Q32.32 EWMA of the block-open tick; PoolTwap's anchor
 ///                              ---
-///                               88 used, 168 free
+///                              152 used, 104 free
 ///
 ///      Native packing is used rather than hand-rolled shifts so that sign extension of the
-///      two signed fields is the compiler's responsibility. `test_PoolState_OccupiesOneSlot`
+///      signed fields is the compiler's responsibility. `test_PoolState_OccupiesExactlyOneSlot`
 ///      asserts the layout, so a field added past the 256-bit budget fails loudly.
 ///
 ///      The reference price is cached rather than read on demand. Reading a Chainlink feed
@@ -23,4 +24,5 @@ struct PoolState {
     int24 referenceTick;
     uint32 lastBlock;
     bool referenceFresh;
+    int64 twapTickX32;
 }

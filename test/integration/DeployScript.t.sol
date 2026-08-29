@@ -36,7 +36,7 @@ contract DeployScriptTest is Test {
         // Any correctly-ordered pair; this test exercises mining and wiring, not pricing.
         address oracle = address(
             new ChainlinkReferenceAdapter(
-                IAggregatorV3(feed), 3600, 1e8, Currency.wrap(address(1)), Currency.wrap(address(2))
+                IAggregatorV3(feed), 3600, 1e8, Currency.wrap(address(1)), 0, Currency.wrap(address(2)), 0
             )
         );
         return AssayConfig({

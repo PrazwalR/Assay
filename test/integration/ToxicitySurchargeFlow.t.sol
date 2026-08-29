@@ -103,6 +103,55 @@ contract ToxicitySurchargeFlowTest is AssayTestBase {
     /// @dev `donate` debits the hook and the returned delta credits it back. If those did not
     ///      cancel exactly, the hook would either accumulate a balance it cannot withdraw or
     ///      leave an unsettled delta, and the PoolManager would revert the whole swap.
+    /// @dev The surcharge on an EXACT-OUTPUT swap. `ToxicitySurcharge.unspecifiedAmount`
+    ///      branches on `amountSpecified < 0 == zeroForOne`, so exact-output selects the
+    ///      opposite currency to exact-input. That branch is covered at the unit level but
+    ///      the `donate` path itself had only ever run on exact-input swaps.
+    ///
+    ///      If the currency selection were wrong here, the hook would donate one currency
+    ///      while returning a delta denominated in the other, leaving the delta unsettled
+    ///      and reverting the whole transaction -- a swap-path revert, the worst failure
+    ///      class in the system.
+    function test_ExactOutputSwap_SurchargesWithoutStrandingADelta() public {
+        _dislocateReference();
+        (uint256 before0, uint256 before1) = _feeGrowth();
+
+        vm.recordLogs();
+        _swap(true, 0.01 ether); // positive amountSpecified == exact output
+
+        bool sawDonation;
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; ++i) {
+            if (logs[i].topics[0] == IAssayEvents.ToxicitySurchargeDonated.selector) sawDonation = true;
+        }
+
+        assertTrue(sawDonation, "an exact-output swap past the ceiling must still surcharge");
+
+        (uint256 after0, uint256 after1) = _feeGrowth();
+        assertGt(after0 + after1, before0 + before1, "the donation must reach liquidity providers");
+        assertEq(IPoolManager(address(manager)).getNonzeroDeltaCount(), 0, "unsettled delta remains");
+        assertEq(token0.balanceOf(address(hook)), 0, "hook accumulated currency0");
+        assertEq(token1.balanceOf(address(hook)), 0, "hook accumulated currency1");
+    }
+
+    /// @dev The mirror direction on exact output, so both currency-selection branches of the
+    ///      donate path are exercised rather than only one.
+    function test_ExactOutputOppositeDirection_SurchargesWithoutStrandingADelta() public {
+        feed.setAnswer(int256(80e6));
+        feed.setUpdatedAt(block.timestamp);
+        vm.roll(block.number + 1);
+        _swap(false, -0.0001 ether);
+
+        (int256 drift, bool fresh) = hook.signedMispricing(poolKey.toId(), false);
+        assertTrue(fresh, "reference must be usable");
+        assertGt(drift, 950, "drift must clear the overflow threshold or this proves nothing");
+
+        _swap(false, 0.01 ether);
+        assertEq(IPoolManager(address(manager)).getNonzeroDeltaCount(), 0, "unsettled delta remains");
+        assertEq(token0.balanceOf(address(hook)), 0, "hook accumulated currency0");
+        assertEq(token1.balanceOf(address(hook)), 0, "hook accumulated currency1");
+    }
+
     function test_Surcharge_LeavesTheHookHoldingNothing() public {
         _dislocateReference();
         _swap(true, -0.05 ether);
@@ -158,22 +207,29 @@ contract ToxicitySurchargeFlowTest is AssayTestBase {
         );
     }
 
-    /// @dev A surcharge is owed but the swap is so small the amount rounds to zero. Donating
-    ///      nothing would still cost an external call and emit a meaningless event, so the
-    ///      path returns early -- and it must not revert or mis-settle on the way out.
-    function test_DustSwap_OwesASurchargeThatRoundsToNothing() public {
+    /// @dev A surcharge whose exact value is a fraction of one wei. `surchargeAmount` rounds
+    ///      up, so the swapper pays one wei rather than nothing: a fee that rounds down is a
+    ///      fee the swapper does not pay, and on the toxic side that is exactly the wrong
+    ///      direction to leak. One wei is the smallest unit the ledger can express, so this
+    ///      is the tightest the rounding can be. The settlement must still net out.
+    ///
+    ///      Regression test for the pass-1 L-2 finding: this donated nothing while
+    ///      `surchargeAmount` used `FullMath.mulDiv`.
+    function test_DustSwap_RoundsItsSubWeiSurchargeUpToOne() public {
         _dislocateReference();
 
         vm.recordLogs();
-        _swap(true, -40); // 40 wei: the surcharge is a fraction of one wei
+        _swap(true, -40); // 40 wei: the exact surcharge is far below one wei
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
+        uint256 donated = type(uint256).max;
         for (uint256 i = 0; i < logs.length; ++i) {
-            assertTrue(
-                logs[i].topics[0] != IAssayEvents.ToxicitySurchargeDonated.selector,
-                "a surcharge that rounds to zero must not be donated"
-            );
+            if (logs[i].topics[0] == IAssayEvents.ToxicitySurchargeDonated.selector) {
+                (donated,) = abi.decode(logs[i].data, (uint256, bool));
+            }
         }
+
+        assertEq(donated, 1, "a sub-wei surcharge must round up to one wei, not down to zero");
         assertEq(IPoolManager(address(manager)).getNonzeroDeltaCount(), 0, "unsettled delta remains");
     }
 

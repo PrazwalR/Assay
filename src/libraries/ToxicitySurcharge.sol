@@ -55,6 +55,11 @@ library ToxicitySurcharge {
         // The guarantee that the surcharge never exceeds `notional` -- which is what makes
         // the int128 cast at the call site exact -- holds only while these two are equal, and
         // two matching literals in two files is not a guarantee.
-        return FullMath.mulDiv(notional, overflowPips, FeeBlend.MAX_OVERFLOW_PIPS);
+        //
+        // Rounded up: this is a fee, and a fee that rounds down leaks value to the swapper on
+        // every swap that reaches this path. The bound still holds, because rounding up a
+        // quotient whose exact value is at most `notional` cannot exceed `notional` unless
+        // the division was already exact, in which case there is nothing to round.
+        return FullMath.mulDivRoundingUp(notional, overflowPips, FeeBlend.MAX_OVERFLOW_PIPS);
     }
 }

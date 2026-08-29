@@ -71,7 +71,9 @@ abstract contract AssayTestBase is Test {
             ORACLE_MAX_AGE,
             PRICE_NUMERATOR,
             Currency.wrap(address(token0)),
-            Currency.wrap(address(token1))
+            token0.decimals(),
+            Currency.wrap(address(token1)),
+            token1.decimals()
         );
         hook = _deployHook(_defaultConfig());
         poolKey = _initialisePool(address(hook));

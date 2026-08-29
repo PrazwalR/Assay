@@ -88,6 +88,28 @@ contract ToxicitySurchargeTest is Test {
         assertEq(ToxicitySurcharge.surchargeAmount(1 ether, 0), 0);
     }
 
+    /// @dev Regression test for the pass-1 L-2 finding. The exact surcharge here is three
+    ///      millionths of a wei. `FullMath.mulDiv` returned zero, which forgave the fee
+    ///      outright; the swapper is charged the smallest unit the ledger can express.
+    function test_SurchargeAmount_RoundsUpRatherThanForgivingTheRemainder() public pure {
+        assertEq(ToxicitySurcharge.surchargeAmount(3, 1), 1);
+    }
+
+    /// @dev The rounding direction, stated over the whole domain: the amount taken is never
+    ///      less than the exact share of notional the overflow calls for. Compared in scaled
+    ///      integers so the exact value is never itself rounded. `notional` is a uint128 and
+    ///      `overflowPips` is at most 1e6, so neither product can overflow a uint256.
+    function testFuzz_SurchargeAmount_NeverRoundsDown(uint128 notional, uint24 overflowPips) public pure {
+        overflowPips = uint24(bound(overflowPips, 0, FeeBlend.MAX_OVERFLOW_PIPS));
+        uint256 amount = ToxicitySurcharge.surchargeAmount(notional, overflowPips);
+
+        assertGe(
+            amount * FeeBlend.MAX_OVERFLOW_PIPS,
+            uint256(notional) * overflowPips,
+            "surcharge fell below the exact share of notional"
+        );
+    }
+
     /// @dev The bound that keeps the donation from ever exceeding the swap itself. A
     ///      surcharge larger than the notional it is charged on could not be settled.
     function testFuzz_SurchargeAmount_NeverExceedsNotional(uint128 notional, uint24 overflowPips)

@@ -145,6 +145,52 @@ contract FeeBlendTest is Test {
     }
 
     /// @dev A higher capture share must never produce a cheaper quote for the same drift.
+    /// @dev Regression test for the pass-1 L-1 finding. At a capture share that does not
+    ///      divide 10,000, the exact surcharge for one tick of drift is 33.33 pips. Signed
+    ///      division in Solidity truncates toward zero, which would quote 33 -- below the
+    ///      exact value, on the side of the trade that is capturing drift from liquidity
+    ///      providers. The fee is rounded up instead.
+    function test_Rounding_QuoteIsNeverBelowTheExactFee() public pure {
+        // 1 tick * 100 pips * 3333 / 10000 = 33.33 pips exactly.
+        assertEq(FeeBlend.quote(1, true, BASE, MIN, MAX, 3333), BASE + 34);
+    }
+
+    /// @dev Rounding is toward positive infinity on *both* signs, not away from zero. A swap
+    ///      trading away from the reference is quoted a discount, and rounding that discount
+    ///      up shrinks it -- the same direction the surcharge case rounds. Both favour the
+    ///      liquidity provider, which is what makes the rule statable in one sentence.
+    function test_Rounding_IsTowardTheLiquidityProviderOnBothSides() public pure {
+        // -33.33 pips of discount, kept at -33 rather than deepened to -34.
+        assertEq(FeeBlend.quote(-1, true, BASE, MIN, MAX, 3333), BASE - 33);
+    }
+
+    /// @dev A share that divides 10,000 must still be exact. Rounding up unconditionally
+    ///      would inflate every quote by a pip, which is a different bug in the same place.
+    function test_Rounding_ExactSharesAreNotInflated() public pure {
+        assertEq(FeeBlend.quote(1, true, BASE, MIN, MAX, 2500), BASE + 25);
+        assertEq(FeeBlend.quote(-1, true, BASE, MIN, MAX, 2500), BASE - 25);
+    }
+
+    /// @dev The total statement of the rounding rule, over drift and share jointly: the quote
+    ///      is never below the exact rational fee, and never more than one pip above it.
+    ///      Bounds are set wide and the drift kept small so neither clamp fires and the raw
+    ///      value is observable through `quote`.
+    function testFuzz_RoundingIsUpwardAndWithinOnePip(int256 ticks, uint24 share) public pure {
+        ticks = bound(ticks, -1000, 1000);
+        share = uint24(bound(share, 0, 10_000));
+
+        uint24 base = 500_000; // mid-range, so a +/-100,000 pip surcharge cannot clamp
+        uint24 quoted = FeeBlend.quote(ticks, true, base, 0, 1_000_000, share);
+
+        // Compared in scaled integers, so the exact rational value is never itself rounded.
+        int256 exactScaled = int256(uint256(base)) * FeeBlend.BPS_DENOMINATOR + ticks * FeeBlend.PIPS_PER_TICK
+            * int256(uint256(share));
+        int256 quotedScaled = int256(uint256(quoted)) * FeeBlend.BPS_DENOMINATOR;
+
+        assertGe(quotedScaled, exactScaled, "quote fell below the exact fee");
+        assertLt(quotedScaled - exactScaled, FeeBlend.BPS_DENOMINATOR, "quote overshot by a full pip");
+    }
+
     function testFuzz_HigherShareNeverQuotesLess(int256 ticks, uint24 lowShare, uint24 highShare)
         public
         pure

@@ -10,6 +10,8 @@ import {IReferencePriceOracle} from "../interfaces/IReferencePriceOracle.sol";
 
 /// @notice Minimal view of a Chainlink aggregator.
 interface IAggregatorV3 {
+    function decimals() external view returns (uint8);
+
     function latestRoundData()
         external
         view
@@ -42,24 +44,54 @@ contract ChainlinkReferenceAdapter is IReferencePriceOracle {
     error ChainlinkReferenceAdapter__PriceNumeratorIsZero();
     error ChainlinkReferenceAdapter__CurrenciesOutOfOrder(address currency0, address currency1);
 
+    /// @dev `provided` is the caller's argument; `expected` is derived from the feed's own
+    ///      `decimals()` plus the two decimal arguments, at construction time. A mismatch
+    ///      means the numerator was computed for a different decimal configuration than the
+    ///      one actually deployed -- exactly the mistake that decodes a feed answer into a
+    ///      reference price wrong by orders of magnitude.
+    error ChainlinkReferenceAdapter__PriceNumeratorMismatch(uint256 provided, uint256 expected);
+
     /// @notice Binds the adapter to one feed and one pool orientation.
+    /// @dev `currency0Decimals` and `currency1Decimals` are not stored; they exist only to
+    ///      let the constructor recompute `priceNumerator` independently and reject a caller
+    ///      whose value does not match. Deriving it here rather than trusting a hand-typed
+    ///      argument is what closes the mistake: a numerator computed for the wrong feed or
+    ///      token decimals used to deploy silently and price every swap against a reference
+    ///      that was not the price of anything.
     /// @param feed The Chainlink aggregator to read.
     /// @param maxAgeSeconds How old a reading may be before it stops counting as fresh.
-    /// @param priceNumerator Decimal scaling for this pool's token pair and this feed.
+    /// @param priceNumerator Decimal scaling for this pool's token pair and this feed:
+    ///        `10 ** (currency1Decimals - currency0Decimals + feed.decimals())`.
     /// @param currency0 Lower-sorted currency of the pair this scaling describes.
+    /// @param currency0Decimals The ERC-20 decimals of `currency0` (18 for native ETH).
     /// @param currency1 Higher-sorted currency of that pair.
+    /// @param currency1Decimals The ERC-20 decimals of `currency1` (18 for native ETH).
     constructor(
         IAggregatorV3 feed,
         uint256 maxAgeSeconds,
         uint256 priceNumerator,
         Currency currency0,
-        Currency currency1
+        uint8 currency0Decimals,
+        Currency currency1,
+        uint8 currency1Decimals
     ) {
         if (address(feed) == address(0)) {
             revert ChainlinkReferenceAdapter__FeedIsZeroAddress();
         }
         if (maxAgeSeconds == 0) revert ChainlinkReferenceAdapter__MaxAgeIsZero();
         if (priceNumerator == 0) revert ChainlinkReferenceAdapter__PriceNumeratorIsZero();
+
+        // Real ERC-20 decimals and feed decimals both sit in a small range (0-18 for every
+        // token and feed this adapter is deployed against), so `currency1Decimals +
+        // feed.decimals()` is never smaller than `currency0Decimals` in practice. If a future
+        // deployment somehow violates that, the subtraction underflows and this constructor
+        // reverts -- failing exactly as safely as the explicit checks around it, just with a
+        // panic instead of a custom error.
+        uint256 expectedNumerator =
+            10 ** (uint256(currency1Decimals) + uint256(feed.decimals()) - uint256(currency0Decimals));
+        if (priceNumerator != expectedNumerator) {
+            revert ChainlinkReferenceAdapter__PriceNumeratorMismatch(priceNumerator, expectedNumerator);
+        }
 
         // v4 pool keys always carry currency0 < currency1. Enforcing the same ordering here
         // means a consumer can compare the two directly rather than sorting first, and a
@@ -84,10 +116,13 @@ contract ChainlinkReferenceAdapter is IReferencePriceOracle {
     }
 
     /// @inheritdoc IReferencePriceOracle
-    /// @dev `roundId`, `startedAt` and `answeredInRound` are deliberately discarded. The
+    /// @dev `roundId` and `answeredInRound` are deliberately discarded. The
     ///      `answeredInRound >= roundId` idiom applied to legacy aggregators and is no
     ///      longer meaningful for OCR feeds, so checking it would provide false assurance
-    ///      rather than protection; `updatedAt` is the field that actually carries staleness.
+    ///      rather than protection. `startedAt` and `updatedAt` are both checked for zero: an
+    ///      OCR feed writes them together, so this is one condition observed through two
+    ///      fields, and checking both costs one comparison against a round that never
+    ///      completed being reported as usable.
     ///
     ///      Staleness is a wall-clock question, so `block.timestamp` is the only available
     ///      answer. A proposer can nudge it by a few seconds, which is immaterial against a
@@ -98,8 +133,10 @@ contract ChainlinkReferenceAdapter is IReferencePriceOracle {
         // A feed that reverts, returns a non-positive answer, or has stopped updating is a
         // stale reading, not an error. try/catch keeps a misbehaving external contract from
         // propagating a revert into the swap that triggered this read.
-        try FEED.latestRoundData() returns (uint80, int256 answer, uint256, uint256 updatedAt, uint80) {
-            if (answer <= 0 || updatedAt == 0) return (0, false);
+        try FEED.latestRoundData() returns (
+            uint80, int256 answer, uint256 startedAt, uint256 updatedAt, uint80
+        ) {
+            if (answer <= 0 || startedAt == 0 || updatedAt == 0) return (0, false);
             if (block.timestamp > updatedAt && block.timestamp - updatedAt > MAX_AGE_SECONDS) {
                 return (0, false);
             }

@@ -4,6 +4,8 @@ pragma solidity 0.8.26;
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 
 import {IAssayErrors} from "../interfaces/IAssayErrors.sol";
+import {Mispricing} from "../libraries/Mispricing.sol";
+import {Q32x32} from "../libraries/Q32x32.sol";
 
 /// @notice Construction-time parameters for a hook deployment.
 /// @dev Solidity cannot mark a struct `immutable`, so the hook stores these as individual
@@ -16,6 +18,8 @@ struct AssayConfig {
     uint24 maxFeePips;
     uint24 captureShareBps;
     address referenceOracle;
+    uint24 maxReferenceDeviationTicks;
+    uint64 twapLambdaX32;
 }
 
 /// @notice Validation for `AssayConfig`.
@@ -51,6 +55,27 @@ library AssayConfigLib {
         }
         if (config.referenceOracle == address(0)) {
             revert IAssayErrors.AssayHook__ReferenceOracleIsZeroAddress();
+        }
+        // A cap larger than the mispricing clamp itself could never trip: no drift the rest
+        // of the system computes ever exceeds Mispricing.MAX_MISPRICING_TICKS. Zero is
+        // exempted deliberately -- it is the documented "cap disabled" value, not a bound to
+        // check against this ceiling.
+        if (
+            config.maxReferenceDeviationTicks != 0
+                && config.maxReferenceDeviationTicks > uint256(Mispricing.MAX_MISPRICING_TICKS)
+        ) {
+            revert IAssayErrors.AssayHook__ReferenceDeviationCapTooLarge(
+                config.maxReferenceDeviationTicks, uint24(uint256(Mispricing.MAX_MISPRICING_TICKS))
+            );
+        }
+        // Required unconditionally, even when the cap above is disabled: this lambda also
+        // drives the stored TWAP itself, and a value outside blendSigned's precondition
+        // corrupts that average regardless of whether anything currently checks it against a
+        // bound. Zero would mean "forget all history every block", which is a single-block
+        // sample -- exactly what an attacker can move within one transaction, and exactly
+        // what this estimator exists to be resistant to.
+        if (config.twapLambdaX32 == 0 || config.twapLambdaX32 > Q32x32.ONE) {
+            revert IAssayErrors.AssayHook__TwapLambdaOutOfRange(config.twapLambdaX32, Q32x32.ONE);
         }
     }
 }

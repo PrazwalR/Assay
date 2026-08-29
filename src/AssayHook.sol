@@ -21,6 +21,7 @@ import {IAssayEvents} from "./interfaces/IAssayEvents.sol";
 import {IReferencePriceOracle} from "./interfaces/IReferencePriceOracle.sol";
 import {FeeBlend} from "./libraries/FeeBlend.sol";
 import {Mispricing} from "./libraries/Mispricing.sol";
+import {PoolTwap} from "./libraries/PoolTwap.sol";
 import {ToxicitySurcharge} from "./libraries/ToxicitySurcharge.sol";
 import {PoolState} from "./types/PoolState.sol";
 
@@ -30,7 +31,10 @@ import {PoolState} from "./types/PoolState.sol";
 ///      state and returns values. That separation is what makes the math independently
 ///      fuzzable without a PoolManager. The only arithmetic here is the `|` that sets v4's
 ///      fee-override flag and the `uint32(block.number)` narrowing used to detect a block
-///      boundary -- neither is a formula, and both are covered by the tests below.
+///      boundary; the only other control flow is the boolean combination in
+///      `_advanceStateInPlace` that lets the deviation cap veto a reading `_readReference`
+///      itself reported fresh. None of these is a formula, and all are covered by the tests
+///      below.
 ///
 ///      The quoted fee is set from the drift a swap captures against a cached reference
 ///      price. Realised variance and order-flow imbalance were previously maintained here
@@ -47,6 +51,8 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     uint24 private immutable MAX_FEE_PIPS;
     uint24 private immutable CAPTURE_SHARE_BPS;
     IReferencePriceOracle private immutable REFERENCE_ORACLE;
+    uint24 private immutable MAX_REFERENCE_DEVIATION_TICKS;
+    uint64 private immutable TWAP_LAMBDA_X32;
 
     mapping(PoolId poolId => PoolState) private _poolState;
 
@@ -63,6 +69,8 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         MAX_FEE_PIPS = config.maxFeePips;
         CAPTURE_SHARE_BPS = config.captureShareBps;
         REFERENCE_ORACLE = IReferencePriceOracle(config.referenceOracle);
+        MAX_REFERENCE_DEVIATION_TICKS = config.maxReferenceDeviationTicks;
+        TWAP_LAMBDA_X32 = config.twapLambdaX32;
     }
 
     /// @notice The permissions this hook requires, and no others.
@@ -126,6 +134,27 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         return (Mispricing.signedTicks(state.referenceTick, state.lastTick, zeroForOne), state.referenceFresh);
     }
 
+    /// @notice The pool's smoothed tick anchor and how far the cached reference sits from it.
+    /// @dev Exposes the deviation-cap inputs directly, so an operator or dashboard can see
+    ///      why a reference was rejected rather than only that it was -- the same reasoning
+    ///      that gives `ReferenceDeviationCapTripped` its own event instead of folding into
+    ///      `ReferenceFreshnessChanged`.
+    /// @param poolId The pool to read.
+    /// @return twapTick The pool's smoothed tick anchor.
+    /// @return deviationTicks Signed distance from that anchor to the cached reference tick.
+    /// @return withinBound Whether that distance is inside the configured cap; always true
+    ///         when the cap is disabled (`maxReferenceDeviationTicks == 0`).
+    function referenceDeviation(PoolId poolId)
+        external
+        view
+        returns (int24 twapTick, int256 deviationTicks, bool withinBound)
+    {
+        PoolState memory state = _poolState[poolId];
+        twapTick = PoolTwap.tick(state.twapTickX32);
+        deviationTicks = PoolTwap.deviationTicks(state.twapTickX32, state.referenceTick);
+        withinBound = PoolTwap.withinBound(state.twapTickX32, state.referenceTick, MAX_REFERENCE_DEVIATION_TICKS);
+    }
+
     /// @dev The fee a given state and direction imply. Kept in one place so the quote the
     ///      hook returns and the quote it reports in `SwapAssayed` cannot drift apart.
     function _quote(PoolState memory state, bool zeroForOne) private view returns (uint24) {
@@ -187,9 +216,15 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         return this.beforeInitialize.selector;
     }
 
-    /// @dev Seeds the pool's fee and the tick the first variance sample will measure against.
-    ///      Variance and imbalance start at zero, which is the correct prior: no move has been
-    ///      observed yet, and any non-zero seed would be an invented measurement.
+    /// @dev Seeds the pool's fee and the state the first swap will measure against.
+    ///
+    ///      The TWAP anchor is seeded from the same tick as `referenceTick`: a fresh oracle
+    ///      reading if one is available, since that is the best information about the true
+    ///      price that exists before any organic trading has happened on this pool, and the
+    ///      pool's own initial tick otherwise. Seeding it from zero, or from the pool's
+    ///      initial tick regardless of the oracle, would risk the deviation cap tripping on
+    ///      the very first block against a reference that was correct all along -- there is
+    ///      no trading history yet to have earned distrust of it.
     function _afterInitialize(address, PoolKey calldata key, uint160, int24 tick)
         internal
         override
@@ -197,11 +232,13 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     {
         PoolId poolId = key.toId();
         (int24 referenceTick, bool referenceFresh) = _readReference();
+        int24 seedTick = referenceFresh ? referenceTick : tick;
         _poolState[poolId] = PoolState({
             lastTick: tick,
-            referenceTick: referenceFresh ? referenceTick : tick,
+            referenceTick: seedTick,
             lastBlock: uint32(block.number),
-            referenceFresh: referenceFresh
+            referenceFresh: referenceFresh,
+            twapTickX32: PoolTwap.seed(seedTick)
         });
 
         emit PoolRegistered(poolId, BASE_FEE_PIPS);
@@ -349,9 +386,9 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         // at most `notional` and therefore always fits int128. No range check is needed here
         // and adding one would be an unreachable branch.
         uint256 amount = ToxicitySurcharge.surchargeAmount(notional, overflowPips);
-        // As above: an exact integer, zero when the swap is too small for the surcharge to
-        // round to a single unit. Donating zero would cost an external call and emit a
-        // meaningless event.
+        // As above: an exact integer. `surchargeAmount` rounds up, so this is zero only when
+        // the swap's unspecified side is itself zero -- a swap whose output rounded away
+        // entirely. Donating zero would cost an external call and emit a meaningless event.
         // slither-disable-next-line incorrect-equality
         if (amount == 0) return 0;
 

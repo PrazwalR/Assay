@@ -52,7 +52,18 @@ library FeeBlend {
             drift = -MAX_DRIFT_TICKS;
         }
 
-        int256 surcharge = (drift * PIPS_PER_TICK * int256(uint256(captureShareBps))) / BPS_DENOMINATOR;
+        int256 scaled = drift * PIPS_PER_TICK * int256(uint256(captureShareBps));
+
+        // Rounded toward positive infinity so the quoted fee is never below the exact value.
+        // Solidity's signed division truncates toward zero, which lowers the fee on the
+        // capturing side -- the toxic side -- and is therefore the liquidity-adverse
+        // direction. Truncation toward zero already rounds a negative surcharge upward, so
+        // only the positive case needs correcting.
+        int256 surcharge = scaled / BPS_DENOMINATOR;
+        if (scaled > 0 && scaled % BPS_DENOMINATOR != 0) {
+            surcharge += 1;
+        }
+
         return int256(uint256(baseFeePips)) + surcharge;
     }
 

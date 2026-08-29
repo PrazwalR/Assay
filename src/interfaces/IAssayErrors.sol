@@ -32,4 +32,13 @@ interface IAssayErrors {
     /// @notice No reference price source was configured. The mispricing signal is the
     ///         hook's primary input, so a deployment without one cannot price anything.
     error AssayHook__ReferenceOracleIsZeroAddress();
+
+    /// @notice `maxReferenceDeviationTicks` exceeds the largest drift the rest of the system
+    ///         ever computes, so a cap that large could never trip.
+    error AssayHook__ReferenceDeviationCapTooLarge(uint24 maxReferenceDeviationTicks, uint24 upperBound);
+
+    /// @notice The TWAP decay factor was zero or above `Q32x32.ONE`. Zero discards all
+    ///         history every block, which defeats the manipulation resistance the estimator
+    ///         exists for; above `ONE` the blend's own subtraction wraps.
+    error AssayHook__TwapLambdaOutOfRange(uint64 twapLambdaX32, uint64 upperBound);
 }
