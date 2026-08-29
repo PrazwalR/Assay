@@ -22,10 +22,10 @@ library PoolTwap {
     ///      history is defined to equal its first observation, not zero, since zero would
     ///      assert a price of `1.0001**0` regardless of where the pool or reference actually
     ///      sit.
-    function seed(int24 tick) internal pure returns (int64 twapTickX32) {
+    function seed(int24 poolTick) internal pure returns (int64 twapTickX32) {
         // The largest possible tick is TickMath.MAX_TICK (887,272), so the scaled value is
         // at most ~3.81e15 in magnitude -- far inside int64's ~9.22e18 range.
-        return int64(tick) * int64(Q32x32.ONE);
+        return int64(poolTick) * int64(Q32x32.ONE);
     }
 
     /// @dev Folds one block's opening tick into the average.
@@ -34,7 +34,11 @@ library PoolTwap {
     /// @param lambdaX32 Weight retained from `twapTickX32`; MUST be in `(0, Q32x32.ONE]`, the
     ///        same precondition `Q32x32.blendSigned` places on its own `lambda` argument.
     /// @return updated The new average, in the same Q32.32 encoding.
-    function update(int64 twapTickX32, int24 blockOpenTick, uint64 lambdaX32) internal pure returns (int64 updated) {
+    function update(int64 twapTickX32, int24 blockOpenTick, uint64 lambdaX32)
+        internal
+        pure
+        returns (int64 updated)
+    {
         return Q32x32.blendSigned(twapTickX32, seed(blockOpenTick), lambdaX32);
     }
 

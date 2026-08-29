@@ -45,6 +45,16 @@ abstract contract AssayTestBase is Test {
     ///      second point so the mechanism is not only tested at one setting.
     uint24 internal constant CAPTURE_SHARE_BPS = 1000;
 
+    /// @dev Matches the deployed default in `.env`. Loose enough that no dislocation used
+    ///      anywhere else in this suite (the largest is a 50% move, ~4,055 ticks) comes close
+    ///      to tripping it; tight enough to catch an order-of-magnitude feed error. See
+    ///      `.env`'s own comment on this constant for the full reasoning.
+    uint24 internal constant MAX_REFERENCE_DEVIATION_TICKS = 20_000;
+
+    /// @dev Matches the deployed default in `.env`: 0.99 in Q32.32, roughly a 100-block
+    ///      e-folding time.
+    uint64 internal constant TWAP_LAMBDA_X32 = 4_252_017_623;
+
     PoolManager internal manager;
     AssayHook internal hook;
     PoolSwapTest internal swapRouter;
@@ -86,7 +96,9 @@ abstract contract AssayTestBase is Test {
             minFeePips: MIN_FEE_PIPS,
             maxFeePips: MAX_FEE_PIPS,
             captureShareBps: CAPTURE_SHARE_BPS,
-            referenceOracle: address(oracle)
+            referenceOracle: address(oracle),
+            maxReferenceDeviationTicks: MAX_REFERENCE_DEVIATION_TICKS,
+            twapLambdaX32: TWAP_LAMBDA_X32
         });
     }
 

@@ -67,7 +67,7 @@ contract PoolStateTrackingTest is AssayTestBase {
         uint256 word = uint256(vm.load(address(hook), keccak256(abi.encode(poolId, uint256(0)))));
 
         // Offsets follow declaration order: lastTick 0, referenceTick 24, lastBlock 48,
-        // referenceFresh 80 -- 88 bits of the 256 available.
+        // referenceFresh 80, twapTickX32 88 -- 152 bits of the 256 available.
         // forge-lint: disable-next-line(unsafe-typecast)
         int24 lastTick = int24(uint24(word));
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -75,12 +75,15 @@ contract PoolStateTrackingTest is AssayTestBase {
         // forge-lint: disable-next-line(unsafe-typecast)
         uint32 lastBlock = uint32(word >> 48);
         bool referenceFresh = ((word >> 80) & 0xFF) != 0;
+        // forge-lint: disable-next-line(unsafe-typecast)
+        int64 twapTickX32 = int64(uint64(word >> 88));
 
         PoolState memory state = _state();
         assertEq(lastTick, state.lastTick, "lastTick not in the expected bits");
         assertEq(referenceTick, state.referenceTick, "referenceTick not in the expected bits");
         assertEq(lastBlock, state.lastBlock, "lastBlock not in the expected bits");
         assertEq(referenceFresh, state.referenceFresh, "referenceFresh not in the expected bits");
+        assertEq(twapTickX32, state.twapTickX32, "twapTickX32 not in the expected bits");
     }
 
     function test_FeeBounds_ReportConstructorValues() public view {

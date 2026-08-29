@@ -38,13 +38,24 @@ contract DeployAssay is Script {
         return uint24(raw);
     }
 
+    /// @dev Same discipline as `_envUint24`, for the one `uint64` field the config takes.
+    function _envUint64(string memory name) private view returns (uint64) {
+        uint256 raw = vm.envUint(name);
+        require(raw <= type(uint64).max, string.concat(name, " exceeds uint64"));
+        // The require above is the check this lint asks for.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint64(raw);
+    }
+
     function run() external returns (AssayHook hook) {
         AssayConfig memory config = AssayConfig({
             baseFeePips: _envUint24("ASSAY_BASE_FEE_PIPS"),
             minFeePips: _envUint24("ASSAY_MIN_FEE_PIPS"),
             maxFeePips: _envUint24("ASSAY_MAX_FEE_PIPS"),
             captureShareBps: _envUint24("ASSAY_CAPTURE_SHARE_BPS"),
-            referenceOracle: vm.envAddress("ASSAY_REFERENCE_ORACLE")
+            referenceOracle: vm.envAddress("ASSAY_REFERENCE_ORACLE"),
+            maxReferenceDeviationTicks: _envUint24("ASSAY_MAX_REFERENCE_DEVIATION_TICKS"),
+            twapLambdaX32: _envUint64("ASSAY_TWAP_LAMBDA_X32")
         });
         return deploy(IPoolManager(AddressConstants.getPoolManagerAddress(block.chainid)), config);
     }

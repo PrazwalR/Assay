@@ -22,5 +22,6 @@ __pycache__/
 
 *.md
 
+lcov.info
 
 .DS_Store

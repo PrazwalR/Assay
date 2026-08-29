@@ -111,8 +111,9 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
 
     /// @notice Current microstructure state for a pool.
     /// @param poolId The pool to read.
-    /// @return state Last observed tick, the cached reference tick and its freshness, and
-    ///         the block that reference was last refreshed in.
+    /// @return state Last observed tick, the cached reference tick and its freshness, the
+    ///         block that reference was last refreshed in, and the smoothed TWAP anchor the
+    ///         deviation cap checks it against.
     function poolState(PoolId poolId) external view returns (PoolState memory state) {
         return _poolState[poolId];
     }
@@ -152,7 +153,8 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         PoolState memory state = _poolState[poolId];
         twapTick = PoolTwap.tick(state.twapTickX32);
         deviationTicks = PoolTwap.deviationTicks(state.twapTickX32, state.referenceTick);
-        withinBound = PoolTwap.withinBound(state.twapTickX32, state.referenceTick, MAX_REFERENCE_DEVIATION_TICKS);
+        withinBound =
+            PoolTwap.withinBound(state.twapTickX32, state.referenceTick, MAX_REFERENCE_DEVIATION_TICKS);
     }
 
     /// @dev The fee a given state and direction imply. Kept in one place so the quote the
@@ -328,7 +330,32 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         if (state.lastBlock != uint32(block.number)) {
             state.lastBlock = uint32(block.number);
 
+            // `state.lastTick` still holds wherever the pool stood at the end of the
+            // previous block: this runs before it is overwritten below with the current
+            // swap's own tick, so nothing this block's swaps have done can be reflected in
+            // the sample folded in here. That is what keeps the average resistant to being
+            // moved from inside the same block that needs it to look a certain way.
+            state.twapTickX32 = PoolTwap.update(state.twapTickX32, state.lastTick, TWAP_LAMBDA_X32);
+
             (int24 referenceTick, bool referenceFresh) = _readReference();
+
+            // A reading the oracle itself reports as fresh can still be rejected here: it
+            // disagrees with where the pool has actually been trading by more than the
+            // configured cap. Treating it identically to an unusable reading -- rather than
+            // adopting it and letting `FeeBlend` price against it -- is what closes the gap
+            // a compromised or misconfigured feed would otherwise leave: any error large
+            // enough to matter shows up as a large, sustained gap against the pool's own
+            // cost-to-manipulate trading history, not as a single flag this hook can miss.
+            if (
+                referenceFresh
+                    && !PoolTwap.withinBound(state.twapTickX32, referenceTick, MAX_REFERENCE_DEVIATION_TICKS)
+            ) {
+                emit ReferenceDeviationCapTripped(
+                    poolId, referenceTick, PoolTwap.tick(state.twapTickX32), MAX_REFERENCE_DEVIATION_TICKS
+                );
+                referenceFresh = false;
+            }
+
             if (referenceFresh) {
                 state.referenceTick = referenceTick;
             }

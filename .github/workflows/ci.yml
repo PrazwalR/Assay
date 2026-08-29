@@ -88,7 +88,7 @@ jobs:
       - name: Slither
         run: |
           pip install slither-analyzer==0.11.6
-          slither . --config-file slither.config.json --fail-on medium
+          slither . --config-file slither.config.json --fail-medium
 
   secrets:
     runs-on: ubuntu-latest

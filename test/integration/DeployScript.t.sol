@@ -44,7 +44,9 @@ contract DeployScriptTest is Test {
             minFeePips: 100,
             maxFeePips: 10_000,
             captureShareBps: 5000,
-            referenceOracle: oracle
+            referenceOracle: oracle,
+            maxReferenceDeviationTicks: 20_000,
+            twapLambdaX32: 4_252_017_623
         });
     }
 
