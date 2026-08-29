@@ -7,6 +7,7 @@ import { useLiveProtocol } from "@/hooks/useLiveProtocol";
 import { useSwapQuote } from "@/hooks/useSwapQuote";
 import { num, pipsToPct, usd } from "@/lib/format";
 import { GAS } from "@/lib/protocol/config";
+import { formatGasCostUsd, gasCostUsd } from "@/lib/protocol/gasCost";
 
 export function SwapCard() {
   const {
@@ -20,9 +21,15 @@ export function SwapCard() {
     referenceFresh,
     toggleReferenceFresh,
   } = useAssay();
-  const { blockNumber } = useLiveProtocol();
+  const { blockNumber, gasPriceWei, referenceUsd } = useLiveProtocol();
   const { isConnected } = useAccount();
   const swap = useSwapQuote();
+
+  // Gas in units is not something a trader can act on. Both inputs to the money figure are live
+  // reads — the gas price from the chain, the ETH price from the same feed the hook prices
+  // against — so this is a real cost, not an assumed one.
+  const hookGas = referenceFresh ? GAS.ordinarySwap : GAS.blockBoundary;
+  const hookGasUsd = gasCostUsd(hookGas, gasPriceWei, referenceUsd);
 
   const {
     inToken,
@@ -174,9 +181,8 @@ export function SwapCard() {
           {num(minimumReceived, outToken.decimals)} {outToken.symbol}
         </DetailRow>
         <DetailRow label="Hook gas">
-          {referenceFresh
-            ? GAS.ordinarySwap.toLocaleString("en-US")
-            : GAS.blockBoundary.toLocaleString("en-US")}
+          {hookGas.toLocaleString("en-US")}
+          <span className="ml-2 text-text-muted">{formatGasCostUsd(hookGasUsd)}</span>
         </DetailRow>
       </dl>
 

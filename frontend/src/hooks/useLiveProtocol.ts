@@ -1,6 +1,6 @@
 "use client";
 
-import { useBlockNumber, useReadContract } from "wagmi";
+import { useBlockNumber, useGasPrice, useReadContract } from "wagmi";
 
 import { HOOK_ABI, ORACLE_ADAPTER_ABI } from "@/lib/protocol/abi";
 import { BASE_SEPOLIA_CHAIN_ID, CONTRACTS, DEPLOYED } from "@/lib/protocol/config";
@@ -33,12 +33,19 @@ export interface LiveProtocol {
   /** True when the live bounds disagree with the compiled-in constants — worth surfacing. */
   boundsMatchConfig: boolean;
   blockNumber: bigint | undefined;
+  /** Live gas price in wei. Assumed values are how gas estimates end up 100x wrong. */
+  gasPriceWei: bigint | undefined;
 }
 
 export function useLiveProtocol(): LiveProtocol {
   const { data: blockNumber } = useBlockNumber({
     chainId: BASE_SEPOLIA_CHAIN_ID,
     watch: true,
+  });
+
+  const { data: gasPriceWei } = useGasPrice({
+    chainId: BASE_SEPOLIA_CHAIN_ID,
+    query: { refetchInterval: 30_000 },
   });
 
   const { data: feeBounds, isLoading: boundsLoading } = useReadContract({
@@ -92,5 +99,6 @@ export function useLiveProtocol(): LiveProtocol {
     bounds,
     boundsMatchConfig,
     blockNumber,
+    gasPriceWei,
   };
 }
