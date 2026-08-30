@@ -7,7 +7,7 @@ import { WagmiProvider } from "wagmi";
 import { wagmiConfig } from "@/lib/wagmi";
 import { DEPLOYED } from "@/lib/protocol/config";
 import type { DataMode } from "@/lib/protocol/fixtures";
-import { TOKEN_PAIR } from "@/lib/protocol/fixtures";
+import { CURRENCY0, CURRENCY1 } from "@/lib/protocol/tokens";
 import { quote, ceilingOverflowPips } from "@/lib/protocol/feeBlend";
 import { toneFor, toneLabel, type Tone } from "@/lib/protocol/tone";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -89,8 +89,9 @@ function AssayProvider({ children }: { children: React.ReactNode }) {
   const live = walkRequested && !reducedMotion;
   const [referenceFresh, setReferenceFresh] = useState(true);
   const [dataMode, setDataMode] = useState<DataMode>("testnet");
-  const [tokenIn, setTokenIn] = useState(TOKEN_PAIR.testnet[0]);
-  const [tokenOut, setTokenOut] = useState(TOKEN_PAIR.testnet[1]);
+  // The real pool pair. Both directions are tradeable, so which is "in" is just a default.
+  const [tokenIn, setTokenIn] = useState(CURRENCY0.symbol);
+  const [tokenOut, setTokenOut] = useState(CURRENCY1.symbol);
   const [amountIn, setAmountIn] = useState("1.5");
   const [slippageIndex, setSlippageIndex] = useState(1);
   const [modal, setModal] = useState<ModalKind>(null);
@@ -130,14 +131,10 @@ function AssayProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // The toggle now only scales the Markets fixtures. It no longer swaps the token set: there is
+  // one real pool, and offering a second pair would imply a market that does not exist.
   const toggleDataMode = useCallback(() => {
-    setDataMode((current) => {
-      const next: DataMode = current === "testnet" ? "mainnet-mock" : "testnet";
-      const [nextIn, nextOut] = TOKEN_PAIR[next];
-      setTokenIn(nextIn);
-      setTokenOut(nextOut);
-      return next;
-    });
+    setDataMode((current) => (current === "testnet" ? "mainnet-mock" : "testnet"));
   }, []);
 
   const flipDirection = useCallback(() => {

@@ -4,8 +4,8 @@ import { useAssay } from "@/components/Providers";
 import { useLiveProtocol } from "@/hooks/useLiveProtocol";
 import { useSwapQuote } from "@/hooks/useSwapQuote";
 import { num } from "@/lib/format";
-import { POOL_ID, ROUTER_SENDERS } from "@/lib/protocol/fixtures";
-import { DEPLOYED } from "@/lib/protocol/config";
+import { POOL_ID } from "@/lib/protocol/fixtures";
+import { DEPLOYED, ROUTERS, shortAddress } from "@/lib/protocol/config";
 
 /**
  * What the hook would emit for this quote.
@@ -29,13 +29,13 @@ export function EventLog() {
     {
       name: "SwapAssayed",
       tone: "current" as const,
-      args: `feePips ${feePips.toLocaleString("en-US")} · sender ${ROUTER_SENDERS[0]} (router)`,
+      args: `feePips ${feePips.toLocaleString("en-US")} · sender ${shortAddress(ROUTERS.swap)} (router)`,
       when: at(0),
     },
     {
       name: "SwapAssayed",
       tone: "benign" as const,
-      args: `feePips ${twinFeePips.toLocaleString("en-US")} · sender ${ROUTER_SENDERS[1]} (router)`,
+      args: `feePips ${twinFeePips.toLocaleString("en-US")} · sender ${shortAddress(ROUTERS.swap)} (router)`,
       when: at(0),
     },
     overflowPips > 0

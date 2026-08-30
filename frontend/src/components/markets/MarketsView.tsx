@@ -11,10 +11,9 @@ import {
   MARKET_BASELINE,
   POOL_ID,
   RANGES,
-  TOKENS,
-  TOKEN_PAIR,
   type RangeLabel,
 } from "@/lib/protocol/fixtures";
+import { CURRENCY0, CURRENCY1 } from "@/lib/protocol/tokens";
 
 /**
  * Markets.
@@ -30,7 +29,6 @@ export function MarketsView() {
 
   const factor = RANGES.find((entry) => entry.label === range)?.factor ?? 1;
   const baseline = MARKET_BASELINE[dataMode];
-  const [inKey, outKey] = TOKEN_PAIR[dataMode];
 
   return (
     <main className="mx-auto max-w-[1240px] px-6 pb-[90px] pt-9">
@@ -176,19 +174,19 @@ export function MarketsView() {
             <span className="flex">
               <span
                 className="size-6 rounded-full border-2 border-surface"
-                style={{ background: TOKENS[inKey].color }}
+                style={{ background: CURRENCY0.color }}
               />
               <span
                 className="-ml-[9px] size-6 rounded-full border-2 border-surface"
-                style={{ background: TOKENS[outKey].color }}
+                style={{ background: CURRENCY1.color }}
               />
             </span>
             <span>
               <span className="block text-sm font-semibold leading-tight">
-                {TOKENS[inKey].symbol} / {TOKENS[outKey].symbol}
+                {CURRENCY0.symbol} / {CURRENCY1.symbol}
               </span>
               <span className="mt-1 block font-mono text-[11px] leading-none text-text-muted">
-                {dataMode === "testnet" ? "Base Sepolia · chain 84532" : "Ethereum · chain 1 · mock"}
+                Base Sepolia · chain 84532
               </span>
             </span>
           </div>

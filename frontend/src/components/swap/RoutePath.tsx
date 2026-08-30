@@ -48,15 +48,16 @@ export function RoutePath() {
         </RouteRow>
         <RouteRow label="pool tick / reference tick">
           <span className="tnum text-text-dim">
-            {signed(poolTick)} / {signed(referenceTick)}
+            {poolTick === undefined || referenceTick === undefined
+              ? "reading…"
+              : `${signed(poolTick)} / ${signed(referenceTick)}`}
           </span>
         </RouteRow>
       </dl>
 
       <p className="mt-3 text-[11.5px] leading-[1.5] text-text-muted">
-        The reference tick is read from the oracle. The pool tick shown here follows the drift
-        control above so the quote can be explored across its range; the pool&apos;s own current
-        tick is on the overview.
+        Both ticks are read from the deployed hook&apos;s own state. Their difference, signed by
+        the direction of this swap, is the entire input to the fee above.
       </p>
     </section>
   );

@@ -1,29 +1,52 @@
 "use client";
 
-import { useAccount } from "wagmi";
+import { useCallback } from "react";
+import { formatUnits } from "viem";
 
 import { useAssay } from "@/components/Providers";
 import { useLiveProtocol } from "@/hooks/useLiveProtocol";
+import { useSwapExecution } from "@/hooks/useSwapExecution";
 import { useSwapQuote } from "@/hooks/useSwapQuote";
+import { PrimaryCta } from "@/components/swap/PrimaryCta";
+import { TxStatus } from "@/components/swap/TxStatus";
 import { num, pipsToPct, usd } from "@/lib/format";
 import { GAS } from "@/lib/protocol/config";
 import { formatGasCostUsd, gasCostUsd } from "@/lib/protocol/gasCost";
 
 export function SwapCard() {
-  const {
-    tone,
-    toneText,
-    feePips,
-    amountIn,
-    setAmountIn,
-    flipDirection,
-    openModal,
-    referenceFresh,
-    toggleReferenceFresh,
-  } = useAssay();
+  const { tone, toneText, amountIn, setAmountIn, flipDirection, openModal } = useAssay();
   const { blockNumber, gasPriceWei, referenceUsd } = useLiveProtocol();
-  const { isConnected } = useAccount();
   const swap = useSwapQuote();
+
+  const {
+    inToken,
+    outToken,
+    amount,
+    amountInUnits,
+    balanceIn,
+    balanceInUnits,
+    balanceOut,
+    amountInUsd,
+    netOut,
+    netOutUsd,
+    rate,
+    minimumReceived,
+    feePips,
+    driftIsLive,
+    referenceFresh,
+    refetchBalances,
+  } = swap;
+
+  // A confirmed swap changes both balances and the pool's drift. Refetching immediately is what
+  // keeps the next quote from being computed against the state before the swap.
+  const onConfirmed = useCallback(() => refetchBalances(), [refetchBalances]);
+
+  const execution = useSwapExecution({
+    tokenInSymbol: inToken.symbol,
+    amountIn: amountInUnits,
+    balanceIn: balanceInUnits,
+    onConfirmed,
+  });
 
   // Gas in units is not something a trader can act on. Both inputs to the money figure are live
   // reads — the gas price from the chain, the ETH price from the same feed the hook prices
@@ -31,17 +54,12 @@ export function SwapCard() {
   const hookGas = referenceFresh ? GAS.ordinarySwap : GAS.blockBoundary;
   const hookGasUsd = gasCostUsd(hookGas, gasPriceWei, referenceUsd);
 
-  const {
-    inToken,
-    outToken,
-    amount,
-    insufficientBalance,
-    amountInUsd,
-    netOut,
-    netOutUsd,
-    rate,
-    minimumReceived,
-  } = swap;
+  // Fractions are taken in base units, not on the displayed figure: MAX computed from a rounded
+  // display value either leaves dust behind or asks for more than the wallet holds.
+  const setFraction = (numerator: bigint, denominator: bigint) => {
+    if (balanceInUnits === undefined) return;
+    setAmountIn(formatUnits((balanceInUnits * numerator) / denominator, inToken.decimals));
+  };
 
   return (
     <section
@@ -69,11 +87,14 @@ export function SwapCard() {
 
       <div className="rounded-2xl border border-border bg-surface-3 px-4 pb-[13px] pt-[15px] transition-colors focus-within:border-accent/40">
         <div className="mb-[9px] flex items-center justify-between">
-          <label htmlFor="amount-in" className="text-[11.5px] font-medium leading-none text-text-muted">
+          <label
+            htmlFor="amount-in"
+            className="text-[11.5px] font-medium leading-none text-text-muted"
+          >
             You pay
           </label>
           <span className="font-mono text-[11.5px] leading-none text-text-muted">
-            Balance {num(inToken.balance, inToken.decimals)}
+            Balance {balanceIn === undefined ? "—" : num(balanceIn, inToken.displayDecimals)}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -99,14 +120,14 @@ export function SwapCard() {
           <div className="flex gap-[5px]">
             <button
               type="button"
-              onClick={() => setAmountIn((inToken.balance / 2).toFixed(inToken.decimals))}
+              onClick={() => setFraction(1n, 2n)}
               className="h-[22px] rounded-[5px] bg-surface-5 px-2 font-mono text-[10.5px] font-medium leading-none text-text-dim hover:text-text"
             >
               50%
             </button>
             <button
               type="button"
-              onClick={() => setAmountIn(inToken.balance.toFixed(inToken.decimals))}
+              onClick={() => setFraction(1n, 1n)}
               className="h-[22px] rounded-[5px] bg-surface-5 px-2 font-mono text-[10.5px] font-medium leading-none text-text-dim hover:text-text"
             >
               MAX
@@ -134,7 +155,7 @@ export function SwapCard() {
             You receive
           </span>
           <span className="font-mono text-[11.5px] leading-none text-text-muted">
-            Balance {num(outToken.balance, outToken.decimals)}
+            Balance {balanceOut === undefined ? "—" : num(balanceOut, outToken.displayDecimals)}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -143,7 +164,7 @@ export function SwapCard() {
               amount > 0 ? "text-text" : "text-text-ghost"
             }`}
           >
-            {amount > 0 ? num(netOut, outToken.decimals) : "0.00"}
+            {amount > 0 ? num(netOut, outToken.displayDecimals) : "0.00"}
           </output>
           <TokenButton
             symbol={outToken.symbol}
@@ -163,12 +184,21 @@ export function SwapCard() {
         style={{ background: "var(--tone-wash)", borderColor: "var(--tone-border)" }}
       >
         <div className="flex min-w-0 items-center gap-[9px]">
-          <span className="size-[6px] flex-none rounded-full" style={{ background: "var(--tone)" }} />
-          <span className="text-[12.5px] font-medium leading-[1.35]" style={{ color: "var(--tone)" }}>
+          <span
+            className="size-[6px] flex-none rounded-full"
+            style={{ background: "var(--tone)" }}
+          />
+          <span
+            className="text-[12.5px] font-medium leading-[1.35]"
+            style={{ color: "var(--tone)" }}
+          >
             {toneText}
           </span>
         </div>
-        <span className="tnum flex-none text-[15px] font-semibold leading-none" style={{ color: "var(--tone)" }}>
+        <span
+          className="tnum flex-none text-[15px] font-semibold leading-none"
+          style={{ color: "var(--tone)" }}
+        >
           {pipsToPct(feePips)}
         </span>
       </div>
@@ -178,7 +208,7 @@ export function SwapCard() {
           1 {inToken.symbol} = {num(rate, rate > 100 ? 2 : 6)} {outToken.symbol}
         </DetailRow>
         <DetailRow label="Minimum received">
-          {num(minimumReceived, outToken.decimals)} {outToken.symbol}
+          {num(minimumReceived, outToken.displayDecimals)} {outToken.symbol}
         </DetailRow>
         <DetailRow label="Hook gas">
           {hookGas.toLocaleString("en-US")}
@@ -186,39 +216,29 @@ export function SwapCard() {
         </DetailRow>
       </dl>
 
-      {insufficientBalance ? (
-        <ErrorPanel
-          title="Insufficient balance"
-          body={`You are trying to pay ${num(amount, inToken.decimals)} ${inToken.symbol} but hold ${num(inToken.balance, inToken.decimals)}. Reduce the amount, or use MAX.`}
-        />
+      <PrimaryCta
+        stage={execution.stage}
+        symbolIn={inToken.symbol}
+        symbolOut={outToken.symbol}
+        // Connecting is the one action the execution machine does not own: it opens a modal
+        // rather than sending a transaction.
+        onAct={execution.stage === "disconnected" ? () => openModal("wallet") : execution.act}
+      />
+
+      <TxStatus
+        stage={execution.stage}
+        isMining={execution.isMining}
+        hash={execution.hash}
+        error={execution.error}
+      />
+
+      {execution.stage === "needs-approval" ? (
+        <p className="mt-3 text-[11.5px] leading-[1.55] text-text-muted">
+          v4 routes swaps through a callback an ordinary account cannot perform, so the trade goes
+          via a router contract — and the router needs permission to pull your {inToken.symbol}.
+          The approval is for this amount only, not unlimited.
+        </p>
       ) : null}
-
-      {!referenceFresh ? (
-        <ErrorPanel
-          title="Reference price is stale"
-          body="The oracle has not produced a usable reading inside its staleness bound, so the hook cannot tell which flow it is facing. It quotes the 1.00% ceiling rather than reverting — the conservative direction. Wait for the next feed update, or swap knowing the ceiling applies."
-        />
-      ) : null}
-
-      {/*
-        The pool is real and priced by the real hook, but this interface does not yet build and
-        submit the v4 unlock/settle callback a swap needs. Saying "routing not wired" is the
-        precise claim; "Swap" would promise something this button cannot do.
-      */}
-      <button
-        type="button"
-        disabled
-        className="mt-3 h-[50px] w-full cursor-not-allowed rounded-xl bg-surface-4 text-[14.5px] font-semibold text-text-muted"
-      >
-        {isConnected ? "Swap routing not wired yet" : "Connect wallet"}
-      </button>
-
-      <p className="mt-3 text-[11.5px] leading-[1.55] text-text-muted">
-        The pool is live on Base Sepolia and this quote is computed from the real formula against
-        the real reference price. Submitting a swap from the browser needs the v4 unlock and
-        settle callbacks, which are not built here yet — the pool has so far been traded from the
-        deploy script.
-      </p>
 
       <div className="mt-3 flex items-center justify-center gap-2 font-mono text-[11px] leading-none text-text-muted">
         <span
@@ -226,17 +246,12 @@ export function SwapCard() {
           style={{ animation: "assayPulse 2.6s ease-in-out infinite" }}
         />
         <span>
-          {referenceFresh
-            ? "reference fresh · refreshed at most once per block"
-            : "reference stale · degrading to maxFeePips"}
+          {!driftIsLive
+            ? "drift simulated · chain has not answered"
+            : referenceFresh
+              ? "quoted against the live pool · reference fresh"
+              : "reference stale · degrading to maxFeePips"}
         </span>
-        <button
-          type="button"
-          onClick={toggleReferenceFresh}
-          className="text-accent underline underline-offset-2"
-        >
-          simulate
-        </button>
       </div>
     </section>
   );
@@ -260,7 +275,7 @@ function TokenButton({
       className="flex h-[38px] flex-none items-center gap-2 rounded-[19px] border border-border-2 bg-surface-5 py-0 pl-[7px] pr-[10px] text-text transition-transform hover:scale-[1.03] hover:border-border-hover"
     >
       <span
-        className="flex size-6 items-center justify-center rounded-full font-mono text-[9.5px] font-semibold leading-none text-bg"
+        className="flex size-6 items-center justify-center rounded-full font-mono text-[8.5px] font-semibold leading-none text-bg"
         style={{ background: color }}
       >
         {glyph}
@@ -276,18 +291,6 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
     <div className="flex items-center justify-between gap-[14px] bg-surface px-[14px] py-[10px]">
       <dt className="text-[12.5px] leading-none text-text-muted">{label}</dt>
       <dd className="tnum text-[12.5px] leading-none text-text-dim">{children}</dd>
-    </div>
-  );
-}
-
-function ErrorPanel({ title, body }: { title: string; body: string }) {
-  return (
-    <div
-      className="mt-3 rounded-[11px] border border-hot/30 bg-[#150E0C] px-[15px] py-[13px]"
-      style={{ animation: "assayRise 0.24s ease" }}
-    >
-      <p className="mb-[5px] text-[12.5px] font-semibold leading-tight text-hot">{title}</p>
-      <p className="text-[12.5px] leading-[1.5] text-[#9A8480]">{body}</p>
     </div>
   );
 }

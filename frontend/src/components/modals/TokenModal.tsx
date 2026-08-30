@@ -4,23 +4,24 @@ import { useMemo, useState } from "react";
 
 import { useAssay } from "@/components/Providers";
 import { useLiveProtocol } from "@/hooks/useLiveProtocol";
+import { useTokenBalances } from "@/hooks/useTokenBalances";
 import { num, usd } from "@/lib/format";
-import { TOKENS, TOKEN_PAIR } from "@/lib/protocol/fixtures";
+import { CURRENCY0, TOKENS, TOKEN_KEYS } from "@/lib/protocol/tokens";
 
 export function TokenModal({ side }: { side: "tokenIn" | "tokenOut" }) {
-  const { dataMode, setTokenIn, setTokenOut, closeModal } = useAssay();
+  const { setTokenIn, setTokenOut, closeModal } = useAssay();
   const { referenceUsd } = useLiveProtocol();
+  const balances = useTokenBalances();
   const [query, setQuery] = useState("");
 
   const matches = useMemo(() => {
-    const keys = TOKEN_PAIR[dataMode];
     const needle = query.trim().toLowerCase();
-    return keys
-      .map((key) => TOKENS[key])
-      .filter((token) =>
-        !needle ? true : `${token.symbol} ${token.name}`.toLowerCase().includes(needle),
-      );
-  }, [dataMode, query]);
+    return TOKEN_KEYS.map((key) => TOKENS[key]).filter((token) =>
+      !needle
+        ? true
+        : `${token.symbol} ${token.name} ${token.address}`.toLowerCase().includes(needle),
+    );
+  }, [query]);
 
   const pick = (key: string) => {
     if (side === "tokenIn") setTokenIn(key);
@@ -45,12 +46,13 @@ export function TokenModal({ side }: { side: "tokenIn" | "tokenOut" }) {
         <ul className="px-2 pb-[14px]">
           {matches.map((token) => {
             const priceUsd = token.priceUsd ?? referenceUsd;
-            const testnet = token.badge === "testnet";
+            const raw = token.symbol === CURRENCY0.symbol ? balances.currency0 : balances.currency1;
+            const held = raw === undefined ? undefined : Number(raw) / 10 ** token.decimals;
             return (
-              <li key={token.key}>
+              <li key={token.symbol}>
                 <button
                   type="button"
-                  onClick={() => pick(token.key)}
+                  onClick={() => pick(token.symbol)}
                   className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[11px] p-3 text-left transition-colors hover:bg-surface-4"
                 >
                   <span
@@ -67,13 +69,11 @@ export function TokenModal({ side }: { side: "tokenIn" | "tokenOut" }) {
                       <span
                         className="rounded-[4px] px-[5px] py-[3px] font-mono text-[9.5px] font-medium leading-none"
                         style={{
-                          background: testnet
-                            ? "rgb(233 165 68 / 0.14)"
-                            : "rgb(91 208 140 / 0.14)",
-                          color: testnet ? "var(--tone-warm)" : "var(--tone-benign)",
+                          background: "rgb(233 165 68 / 0.14)",
+                          color: "var(--tone-warm)",
                         }}
                       >
-                        {token.badge}
+                        base sepolia
                       </span>
                     </span>
                     <span className="mt-[3px] block text-[12px] leading-tight text-text-muted">
@@ -82,10 +82,10 @@ export function TokenModal({ side }: { side: "tokenIn" | "tokenOut" }) {
                   </span>
                   <span className="text-right">
                     <span className="tnum block text-[13px] leading-none text-text">
-                      {num(token.balance, token.decimals)}
+                      {held === undefined ? "—" : num(held, token.displayDecimals)}
                     </span>
                     <span className="mt-[5px] block font-mono text-[11.5px] leading-none text-text-muted">
-                      {usd(token.balance * priceUsd)}
+                      {held === undefined ? "connect" : usd(held * priceUsd)}
                     </span>
                   </span>
                 </button>
@@ -107,8 +107,8 @@ export function TokenModal({ side }: { side: "tokenIn" | "tokenOut" }) {
       )}
 
       <p className="border-t border-border px-5 py-3 text-[11.5px] leading-[1.5] text-text-muted">
-        Balances shown are fixtures. The pool is real, but this interface reads no token
-        balances beyond the connected wallet&apos;s native one.
+        Balances are read from the chain for the connected wallet. Only these two tokens are
+        listed because the hook refuses any pool whose currencies its oracle does not price.
       </p>
     </div>
   );
