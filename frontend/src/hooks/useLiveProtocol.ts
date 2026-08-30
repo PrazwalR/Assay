@@ -11,10 +11,10 @@ import { referenceUsdFrom } from "@/lib/protocol/reference";
 /**
  * The genuinely live surface — and its exact boundary.
  *
- * These three reads work against the real deployment on Base Sepolia and are verified to
- * respond. Everything else the UI shows about the *pool* (tick, TVL, volume, swap history)
- * cannot be read, because **no pool has ever been initialised against the hook** — so it comes
- * from `lib/protocol/fixtures.ts` and is marked as such wherever it appears.
+ * These reads work against the real deployment on Base Sepolia and are verified to respond.
+ * The pool's own state is read separately in `useLivePool`. What remains a fixture is anything
+ * requiring *history* — volume, fee revenue, the quote distribution — because the pool has been
+ * traded twice and two swaps is not a distribution.
  *
  * `isLive` is what components gate their "live" badge on. It is false while loading and false
  * on any read failure, so the badge is never shown optimistically.

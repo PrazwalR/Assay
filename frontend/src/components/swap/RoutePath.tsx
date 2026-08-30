@@ -54,8 +54,9 @@ export function RoutePath() {
       </dl>
 
       <p className="mt-3 text-[11.5px] leading-[1.5] text-text-muted">
-        The pool tick is derived from the fixture drift, not read from a pool — none exists yet.
-        The reference tick is real.
+        The reference tick is read from the oracle. The pool tick shown here follows the drift
+        control above so the quote can be explored across its range; the pool&apos;s own current
+        tick is on the overview.
       </p>
     </section>
   );

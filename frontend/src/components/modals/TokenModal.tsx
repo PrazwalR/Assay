@@ -107,8 +107,8 @@ export function TokenModal({ side }: { side: "tokenIn" | "tokenOut" }) {
       )}
 
       <p className="border-t border-border px-5 py-3 text-[11.5px] leading-[1.5] text-text-muted">
-        Balances shown are fixtures — no pool is initialised, so there is nothing to hold a
-        position in yet.
+        Balances shown are fixtures. The pool is real, but this interface reads no token
+        balances beyond the connected wallet&apos;s native one.
       </p>
     </div>
   );

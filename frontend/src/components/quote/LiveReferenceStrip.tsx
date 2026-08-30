@@ -1,8 +1,11 @@
 "use client";
 
 import { useLiveProtocol } from "@/hooks/useLiveProtocol";
+import { useLivePool } from "@/hooks/useLivePool";
 import { CONTRACTS, explorerAddress, shortAddress } from "@/lib/protocol/config";
-import { pipsToPct, usd } from "@/lib/format";
+import { pipsToBp, pipsToPct, signed, usd } from "@/lib/format";
+import { quote } from "@/lib/protocol/feeBlend";
+
 
 /**
  * The genuinely-live strip. Everything in it comes from a real contract read on Base Sepolia,
@@ -15,6 +18,13 @@ import { pipsToPct, usd } from "@/lib/format";
 export function LiveReferenceStrip() {
   const { isLive, isLoading, referenceUsd, referenceFresh, bounds, boundsMatchConfig, blockNumber } =
     useLiveProtocol();
+  const pool = useLivePool();
+
+  // The live drift, and what the hook would charge the two directions against it right now.
+  // This is the product's whole claim reduced to two numbers, and both come off the chain.
+  const drift = pool.driftZeroForOne;
+  const towardFee = drift === undefined ? undefined : quote(drift, pool.referenceFresh, bounds);
+  const awayFee = drift === undefined ? undefined : quote(-drift, pool.referenceFresh, bounds);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border-2 bg-surface">
@@ -100,6 +110,57 @@ export function LiveReferenceStrip() {
           </dd>
         </div>
       </dl>
+
+      {/*
+        The live pool. Kept in the same panel as the reference because the two only mean
+        anything together: a fee is the gap between them, priced.
+      */}
+      <div className="grid gap-px border-t border-border bg-border sm:grid-cols-3">
+        <div className="bg-surface px-6 py-5">
+          <p className="mb-3 font-mono text-[10.5px] font-medium uppercase leading-none tracking-[0.1em] text-text-muted">
+            Pool drift
+          </p>
+          <p className="tnum text-[25px] leading-none">
+            {drift === undefined ? "—" : `${signed(drift)} ticks`}
+          </p>
+          <p className="mt-[7px] font-mono text-[11.5px] leading-none text-text-muted">
+            {pool.poolTick === undefined
+              ? "reading…"
+              : `pool ${signed(pool.poolTick)} · ref ${signed(pool.referenceTick ?? 0)}`}
+          </p>
+        </div>
+
+        <div className="bg-surface px-6 py-5">
+          <p className="mb-3 font-mono text-[10.5px] font-medium uppercase leading-none tracking-[0.1em] text-text-muted">
+            Toward the reference
+          </p>
+          <p className="tnum text-[25px] leading-none text-warm">
+            {towardFee === undefined ? "—" : pipsToBp(towardFee)}
+          </p>
+          <p className="mt-[7px] font-mono text-[11.5px] leading-none text-text-muted">
+            captures the drift
+          </p>
+        </div>
+
+        <div className="bg-surface px-6 py-5">
+          <p className="mb-3 font-mono text-[10.5px] font-medium uppercase leading-none tracking-[0.1em] text-text-muted">
+            Away from it
+          </p>
+          <p className="tnum text-[25px] leading-none text-benign">
+            {awayFee === undefined ? "—" : pipsToBp(awayFee)}
+          </p>
+          <p className="mt-[7px] font-mono text-[11.5px] leading-none text-text-muted">
+            captures nothing
+          </p>
+        </div>
+      </div>
+
+      <p className="border-t border-border px-6 py-3 text-[12px] leading-[1.5] text-text-dim">
+        Those two figures are the entire product. Same pool, same instant, same drift — quoted
+        differently because one trade takes value from liquidity providers and the other does
+        not. A volatility-driven hook cannot tell them apart, because volatility is a property of
+        the block and not of the order.
+      </p>
 
       <p className="border-t border-border px-6 py-3 font-mono text-[11.5px] leading-[1.5] text-text-muted">
         hook{" "}

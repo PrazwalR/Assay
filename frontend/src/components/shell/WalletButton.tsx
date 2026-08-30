@@ -8,7 +8,8 @@ import { formatBalance } from "@/lib/format";
 
 /**
  * Real wallet state — a real address, a real balance, from a real connector. The one thing it
- * does not do is offer a swap, because there is no pool to swap against; see `PrimaryCta`.
+ * does not do is submit a swap: the pool is real, but this interface does not build the v4
+ * unlock and settle callbacks a swap needs.
  */
 export function WalletButton() {
   const { openModal } = useAssay();

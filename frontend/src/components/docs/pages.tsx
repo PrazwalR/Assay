@@ -76,11 +76,13 @@ function Introduction() {
           ["Permission mask", <Code key="mask">{PERMISSION_MASK}</Code>],
         ]}
       />
-      <Callout tone="warm" title="No pool is initialised">
-        The hook and its oracle are deployed and responding — the reference price shown on the
-        overview is a live contract read. But no pool has been created against the hook, so
-        there is no trading history, no liquidity, and no <Code>SwapAssayed</Code> events. Every
-        pool-derived figure on this site is a labelled fixture.
+      <Callout tone="warm" title="One pool, two swaps">
+        The hook, its oracle and a USDC/WETH pool are live, and the reference price on the
+        overview is a live contract read. The pool has been traded twice, both times from the
+        deploy script: the two <Code>SwapAssayed</Code> events came out at 500 and 3,070 pips —
+        a 25.7 basis point spread between two swaps in the same block, which is the mechanism
+        doing the only thing it claims to do. What does not exist yet is <em>history</em>, so
+        every aggregate on the markets page remains a labelled fixture.
       </Callout>
     </>
   );
@@ -425,8 +427,8 @@ function NotBuilt() {
       </P>
       <P>
         On the interface side: pools, positions, portfolio and activity surfaces are not built,
-        there is no light theme, and swap execution is not wired because no pool exists to
-        execute against.
+        there is no light theme, and swap execution is not wired — the pool exists and is
+        tradeable, but this interface does not build the v4 unlock and settle callbacks.
       </P>
     </>
   );

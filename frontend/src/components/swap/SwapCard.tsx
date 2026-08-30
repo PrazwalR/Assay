@@ -201,22 +201,23 @@ export function SwapCard() {
       ) : null}
 
       {/*
-        The honest CTA. The prototype assumed a pool existed; none does, so offering "Swap"
-        would be the one lie this interface cannot afford. Naming the gap is spec §9's rule
-        applied to the most prominent control on the page.
+        The pool is real and priced by the real hook, but this interface does not yet build and
+        submit the v4 unlock/settle callback a swap needs. Saying "routing not wired" is the
+        precise claim; "Swap" would promise something this button cannot do.
       */}
       <button
         type="button"
         disabled
         className="mt-3 h-[50px] w-full cursor-not-allowed rounded-xl bg-surface-4 text-[14.5px] font-semibold text-text-muted"
       >
-        {isConnected ? "No pool initialised — swaps are not live" : "Connect wallet"}
+        {isConnected ? "Swap routing not wired yet" : "Connect wallet"}
       </button>
 
       <p className="mt-3 text-[11.5px] leading-[1.55] text-text-muted">
-        The hook is deployed and the reference is fresh, but no pool has been created against it
-        yet, so there is nothing to swap. The quote above is computed from the real formula and
-        the real reference price.
+        The pool is live on Base Sepolia and this quote is computed from the real formula against
+        the real reference price. Submitting a swap from the browser needs the v4 unlock and
+        settle callbacks, which are not built here yet — the pool has so far been traded from the
+        deploy script.
       </p>
 
       <div className="mt-3 flex items-center justify-center gap-2 font-mono text-[11px] leading-none text-text-muted">

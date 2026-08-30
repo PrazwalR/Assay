@@ -19,8 +19,8 @@ import {
 /**
  * Markets.
  *
- * Every figure on this surface is a fixture, because a market needs a pool and none has been
- * initialised. Rather than scatter a dozen individual markers, the whole surface carries one
+ * The pool is real, but two swaps is not a distribution, so every aggregate here is still a
+ * fixture. Rather than scatter a dozen individual markers, the whole surface carries one
  * unmissable disclosure at the top — and the numbers still reconcile with each other, so the
  * shape of the thing being described is honest even though the magnitudes are illustrative.
  */
@@ -75,12 +75,14 @@ export function MarketsView() {
         <span className="mt-[6px] size-[6px] flex-none rounded-full bg-warm" />
         <p className="max-w-[86ch] text-[13px] leading-[1.6] text-[#9A8B72]">
           <strong className="font-semibold text-warm">
-            No pool has been initialised against the hook.
+            The pool is real; this page&apos;s aggregates are not yet.
           </strong>{" "}
-          The hook and its oracle are deployed and responding, but no market exists yet, so
-          there are no swaps, no liquidity and no fee history to read. Every number on this page
-          is an illustrative fixture showing what this surface reports once a pool is live. The
-          reference price on the overview is real; none of this is.
+          The USDC/WETH pool is live on Base Sepolia with real liquidity, and it has been traded
+          twice — both times from the deploy script, which quoted 0.05% and 0.31% for the two
+          directions. Two swaps is not a distribution. Every aggregate below (volume, TVL trend,
+          the scatter, the histogram) remains an illustrative fixture showing the shape this
+          surface reports once there is enough history to measure. The pool identity, the fee
+          bounds and the reference are real.
         </p>
       </div>
 

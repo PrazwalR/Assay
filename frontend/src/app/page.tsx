@@ -116,10 +116,12 @@ export default function OverviewPage() {
             What this does not yet show
           </h2>
           <p className="mb-4 max-w-[70ch] text-[14px] leading-[1.65] text-[#9A8B72] text-pretty">
-            The hook is deployed to Base Sepolia and the reference oracle is live — the price
-            above is read from it. But <strong className="font-semibold">no pool has been
-            initialised against the hook yet</strong>, so there is no trading history, no TVL and
-            no swap events to show. Every pool-derived figure on this site is a labelled fixture.
+            The hook, its oracle and one USDC/WETH pool are live on Base Sepolia, and the
+            reference price above is read from the chain. But the pool has seen{" "}
+            <strong className="font-semibold">two swaps, both from the deploy script</strong> —
+            so the aggregate figures on the markets page (volume, TVL trend, the distribution of
+            quotes) are still illustrative fixtures rather than measurements. There is not yet
+            enough history to measure anything.
           </p>
           <p className="max-w-[70ch] text-[14px] leading-[1.65] text-[#9A8B72] text-pretty">
             Separately, the adverse-selection gate does not currently pass: the mechanism is

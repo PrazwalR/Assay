@@ -10,9 +10,9 @@ import { DEPLOYED } from "@/lib/protocol/config";
 /**
  * What the hook would emit for this quote.
  *
- * The event names and their argument shapes are the real ones from `IAssayEvents.sol` — but no
- * pool exists, so none of these have actually been emitted. The panel says so rather than
- * dressing fixtures as history, which would be the exact failure the status banner warns about.
+ * The event names and their argument shapes are the real ones from `IAssayEvents.sol`, filled
+ * with the current quote. It is a preview of what this swap would emit, not a log fetched from
+ * the chain — the panel says so rather than dressing a projection as history.
  *
  * `sender` is the router that called the PoolManager. It is never the trader, and the copy here
  * says so, because treating it as an identity is the mistake this event invites.
@@ -73,7 +73,7 @@ export function EventLog() {
         <p className="font-mono text-[10.5px] font-medium uppercase leading-none tracking-[0.12em] text-text-muted">
           Hook events, this pool
         </p>
-        <p className="font-mono text-[11.5px] leading-none text-warm">not yet emitted</p>
+        <p className="font-mono text-[11.5px] leading-none text-warm">preview, not fetched</p>
       </header>
 
       <ul>
@@ -98,9 +98,11 @@ export function EventLog() {
 
       <p className="mt-3 border-t border-border pt-3 text-[11.5px] leading-[1.55] text-text-muted">
         These are the real event signatures from{" "}
-        <span className="font-mono">IAssayEvents.sol</span>, populated with this quote — not a
-        log of swaps that happened. No pool has been initialised, so the hook has emitted
-        nothing. <span className="font-mono">sender</span> is the router, never the trader.
+        <span className="font-mono">IAssayEvents.sol</span>, populated with the quote above —
+        a preview of what this swap would emit, not a log fetched from the chain. The pool has
+        emitted two real <span className="font-mono">SwapAssayed</span> events so far, at 500
+        and 3,070 pips. <span className="font-mono">sender</span> is the router, never the
+        trader.
       </p>
     </section>
   );
