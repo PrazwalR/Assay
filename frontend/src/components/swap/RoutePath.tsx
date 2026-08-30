@@ -7,8 +7,8 @@ import { CONTRACTS, explorerAddress, shortAddress } from "@/lib/protocol/config"
 import { signed } from "@/lib/format";
 
 export function RoutePath() {
-  const { feePips, dataMode } = useAssay();
-  const { inToken, outToken, poolTick, referenceTick } = useSwapQuote();
+  const { dataMode } = useAssay();
+  const { inToken, outToken, poolTick, referenceTick, feePips } = useSwapQuote();
 
   return (
     <section className="rounded-2xl border border-border-2 bg-surface px-5 py-[18px]">

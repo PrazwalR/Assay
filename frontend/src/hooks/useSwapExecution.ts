@@ -37,6 +37,7 @@ export type SwapStage =
   | "disconnected"
   | "wrong-network"
   | "enter-amount"
+  | "loading"
   | "insufficient-balance"
   | "needs-approval"
   | "approving"
@@ -62,10 +63,13 @@ export interface SwapExecution {
 /** Wallet rejections are long and stack-y; the first line is the part worth showing. */
 function readableError(error: Error | null): string | undefined {
   if (!error) return undefined;
-  const first = error.message.split("\n")[0].trim();
   if (/user rejected|denied transaction|rejected the request/i.test(error.message)) {
     return "Transaction rejected in your wallet.";
   }
+  const first = error.message.split("\n")[0].trim();
+  // Never return "": the stage reducer treats a falsy message as "no error", which turned a
+  // revert whose reason decoded to nothing into a permanent spinner.
+  if (!first) return "The transaction failed without a reason the wallet could decode.";
   return first.length > 160 ? `${first.slice(0, 157)}…` : first;
 }
 
@@ -74,9 +78,16 @@ export function useSwapExecution(params: {
   /** Input amount in the input token's base units. Zero means "nothing entered". */
   amountIn: bigint;
   balanceIn: bigint | undefined;
+  /**
+   * The price bound to enforce, from the live curve and the user's slippage tolerance.
+   * `undefined` means the pool state has not loaded — in which case no swap is offered at all.
+   * The router has no `amountOutMinimum`, so this is the only protection that exists; sending
+   * the unbounded extreme (as this once did) means the displayed minimum is unenforceable.
+   */
+  priceLimit: bigint | undefined;
   onConfirmed: () => void;
 }): SwapExecution {
-  const { tokenInSymbol, amountIn, balanceIn, onConfirmed } = params;
+  const { tokenInSymbol, amountIn, balanceIn, priceLimit, onConfirmed } = params;
   const { address, isConnected, chainId } = useAccount();
   const { switchChain } = useSwitchChain();
 
@@ -128,6 +139,9 @@ export function useSwapExecution(params: {
   }, [writeContract, tokenIn.address, amountIn]);
 
   const swap = useCallback(() => {
+    // Refuse rather than fall back to an unbounded swap. A trade with no price bound on a pool
+    // this shallow can fill arbitrarily badly and cannot revert.
+    if (priceLimit === undefined) return;
     setIntent("swap");
     writeContract({
       address: ROUTERS.swap,
@@ -148,14 +162,15 @@ export function useSwapExecution(params: {
           // Negative is exact-input in v4. Positive would mean "give me exactly this much out",
           // which is a different trade and a different settlement path.
           amountSpecified: -amountIn,
-          sqrtPriceLimitX96: priceLimitFor(zeroForOne),
+          // Never the unbounded extreme. `swap` is unreachable while this is undefined.
+          sqrtPriceLimitX96: priceLimit ?? priceLimitFor(zeroForOne),
         },
         { takeClaims: false, settleUsingBurn: false },
         "0x",
       ],
       chainId: BASE_SEPOLIA_CHAIN_ID,
     });
-  }, [writeContract, zeroForOne, amountIn]);
+  }, [writeContract, zeroForOne, amountIn, priceLimit]);
 
   const reset = useCallback(() => {
     setIntent(null);
@@ -167,15 +182,23 @@ export function useSwapExecution(params: {
 
   const stage = ((): SwapStage => {
     if (!isConnected) return "disconnected";
-    if (chainId !== BASE_SEPOLIA_CHAIN_ID) return "wrong-network";
-    if (error) return "failed";
+    // Only when nothing is in flight. Switching networks mid-transaction previously replaced the
+    // whole panel, hiding a pending swap behind a "Switch network" button.
+    if (chainId !== BASE_SEPOLIA_CHAIN_ID && intent === null) return "wrong-network";
+    // `!== undefined` deliberately: an empty-string message is still a failure, and `if (error)`
+    // let one through into a permanent silent hang.
+    if (error !== undefined) return "failed";
     if (intent === "swap") return isSuccess ? "confirmed" : "swapping";
-    // An approval is "still approving" until the allowance the chain reports actually covers
-    // the amount — the receipt alone is not proof the router can pull the funds.
-    if (intent === "approve" && !approved) return "approving";
+    // Only while an approval is genuinely outstanding. Previously this branch tested `!approved`
+    // alone, which meant any later edit — flipping direction, changing token, clearing the
+    // amount — re-entered a stage with no action and no exit but a page reload.
+    if (intent === "approve" && !approved && (isMining || !isSuccess)) return "approving";
     if (amountIn <= 0n) return "enter-amount";
     if (balanceIn !== undefined && amountIn > balanceIn) return "insufficient-balance";
-    if (allowance === undefined) return "enter-amount";
+    // Distinguished from "no amount entered": a failed or pending allowance read used to render
+    // "Enter an amount" over a filled field, with no error and no way to retry.
+    if (allowance === undefined) return "loading";
+    if (priceLimit === undefined) return "loading";
     if (!approved) return "needs-approval";
     return "ready";
   })();

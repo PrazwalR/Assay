@@ -9,7 +9,7 @@ import { num, usd } from "@/lib/format";
 import { CURRENCY0, TOKENS, TOKEN_KEYS } from "@/lib/protocol/tokens";
 
 export function TokenModal({ side }: { side: "tokenIn" | "tokenOut" }) {
-  const { setTokenIn, setTokenOut, closeModal } = useAssay();
+  const { tokenIn, tokenOut, setTokenIn, setTokenOut, closeModal } = useAssay();
   const { referenceUsd } = useLiveProtocol();
   const balances = useTokenBalances();
   const [query, setQuery] = useState("");
@@ -23,9 +23,17 @@ export function TokenModal({ side }: { side: "tokenIn" | "tokenOut" }) {
     );
   }, [query]);
 
+  // Choosing the token already on the other side swaps them rather than producing a
+  // same-token pair. The pair has two members, so "pick the other one" is unambiguous — and a
+  // same-token selection previously quoted USDC→USDC while executing USDC→WETH.
   const pick = (key: string) => {
-    if (side === "tokenIn") setTokenIn(key);
-    else setTokenOut(key);
+    if (side === "tokenIn") {
+      if (key === tokenOut) setTokenOut(tokenIn);
+      setTokenIn(key);
+    } else {
+      if (key === tokenIn) setTokenIn(tokenOut);
+      setTokenOut(key);
+    }
     closeModal();
   };
 

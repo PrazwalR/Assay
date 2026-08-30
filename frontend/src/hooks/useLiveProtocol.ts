@@ -92,7 +92,10 @@ export function useLiveProtocol(): LiveProtocol {
       : FALLBACK_REFERENCE_USD;
 
   return {
-    isLive: Boolean(feeBounds) && Boolean(reference) && Boolean(priceNumerator),
+    // `reference` is a tuple, so `Boolean(reference)` is true even for [0n, false] — which let
+    // the green "live" badge sit above the hardcoded fallback price. The freshness flag inside
+    // it is the only honest test.
+    isLive: Boolean(feeBounds) && Boolean(priceNumerator) && referenceFresh,
     isLoading: boundsLoading || referenceLoading,
     referenceUsd,
     referenceFresh,

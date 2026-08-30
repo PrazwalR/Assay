@@ -35,6 +35,10 @@ export function SwapCard() {
     driftIsLive,
     referenceFresh,
     refetchBalances,
+    priceLimit,
+    priceImpact,
+    exceedsLiquidity,
+    slippage,
   } = swap;
 
   // A confirmed swap changes both balances and the pool's drift. Refetching immediately is what
@@ -45,13 +49,17 @@ export function SwapCard() {
     tokenInSymbol: inToken.symbol,
     amountIn: amountInUnits,
     balanceIn: balanceInUnits,
+    priceLimit,
     onConfirmed,
   });
 
   // Gas in units is not something a trader can act on. Both inputs to the money figure are live
   // reads — the gas price from the chain, the ETH price from the same feed the hook prices
   // against — so this is a real cost, not an assumed one.
-  const hookGas = referenceFresh ? GAS.ordinarySwap : GAS.blockBoundary;
+  // The costly path is the *first swap of a block*, which is when the hook refreshes its
+  // reference — not whether the reference is stale. This pool trades rarely enough that a user
+  // swap is almost always that first swap, so quoting the cheap path would understate it ~3x.
+  const hookGas = GAS.blockBoundaryWithLiveFeed;
   const hookGasUsd = gasCostUsd(hookGas, gasPriceWei, referenceUsd);
 
   // Fractions are taken in base units, not on the displayed figure: MAX computed from a rounded
@@ -210,6 +218,11 @@ export function SwapCard() {
         <DetailRow label="Minimum received">
           {num(minimumReceived, outToken.displayDecimals)} {outToken.symbol}
         </DetailRow>
+        <DetailRow label="Price impact">
+          <span className={priceImpact > 0.02 ? "text-warm" : undefined}>
+            {(priceImpact * 100).toFixed(2)}%
+          </span>
+        </DetailRow>
         <DetailRow label="Hook gas">
           {hookGas.toLocaleString("en-US")}
           <span className="ml-2 text-text-muted">{formatGasCostUsd(hookGasUsd)}</span>
@@ -232,6 +245,19 @@ export function SwapCard() {
         error={execution.error}
       />
 
+      {exceedsLiquidity ? (
+        <div className="mt-3 rounded-[11px] border border-hot/30 bg-[#150E0C] px-[15px] py-[13px]">
+          <p className="mb-[5px] text-[12.5px] font-semibold leading-tight text-hot">
+            Larger than the pool
+          </p>
+          <p className="text-[12.5px] leading-[1.5] text-[#9A8480]">
+            This trade would exhaust the seeded liquidity range, so the output above is an upper
+            bound the pool cannot actually pay. The pool holds roughly 38 USDC of depth. Reduce
+            the amount.
+          </p>
+        </div>
+      ) : null}
+
       {execution.stage === "needs-approval" ? (
         <p className="mt-3 text-[11.5px] leading-[1.55] text-text-muted">
           v4 routes swaps through a callback an ordinary account cannot perform, so the trade goes
@@ -247,9 +273,9 @@ export function SwapCard() {
         />
         <span>
           {!driftIsLive
-            ? "drift simulated · chain has not answered"
+            ? "reading the pool…"
             : referenceFresh
-              ? "quoted against the live pool · reference fresh"
+              ? `quoted from the live curve · bounded at ${(slippage * 100).toFixed(1)}%`
               : "reference stale · degrading to maxFeePips"}
         </span>
       </div>

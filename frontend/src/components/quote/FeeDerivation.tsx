@@ -5,7 +5,7 @@ import { useCallback, useRef } from "react";
 import { useAssay } from "@/components/Providers";
 import { useSwapQuote } from "@/hooks/useSwapQuote";
 import { CAP_BINDS_AT_TICKS, DEPLOYED } from "@/lib/protocol/config";
-import { rawQuotedPips } from "@/lib/protocol/feeBlend";
+import { ceilingOverflowPips, rawQuotedPips } from "@/lib/protocol/feeBlend";
 import { num, signed } from "@/lib/format";
 
 const METER_MIN = -300;
@@ -21,8 +21,11 @@ const pct = (drift: number) =>
  * the only honest way to present a fee that changes per swap.
  */
 export function FeeDerivation() {
-  const { drift, setDrift, feePips, overflowPips, tone } = useAssay();
-  const { feePaidOut, outToken } = useSwapQuote();
+  const { setDrift, tone } = useAssay();
+  // The live drift, not the demonstration walk. This panel sits beside the swap card and used
+  // to contradict it — showing 100-3,700 pips next to the card's 790.
+  const { drift, feePips, feePaidOut, outToken, driftIsLive } = useSwapQuote();
+  const overflowPips = ceilingOverflowPips(drift, true, DEPLOYED);
   const meter = useRef<HTMLDivElement>(null);
 
   const raw = rawQuotedPips(drift, DEPLOYED);
@@ -67,14 +70,20 @@ export function FeeDerivation() {
         aria-valuemin={METER_MIN}
         aria-valuemax={METER_MAX}
         aria-valuenow={drift}
+        aria-disabled={driftIsLive}
         onPointerDown={(event) => {
+          // Dragging is a demonstration control. Once the chain answers, the drift shown is the
+          // pool's own and dragging it would contradict the fee beside it.
+          if (driftIsLive) return;
           event.currentTarget.setPointerCapture(event.pointerId);
           driftFromPointer(event.clientX);
         }}
         onPointerMove={(event) => {
+          if (driftIsLive) return;
           if (event.buttons !== 0) driftFromPointer(event.clientX);
         }}
         onKeyDown={(event) => {
+          if (driftIsLive) return;
           const step = event.shiftKey ? 100 : 10;
           if (event.key === "ArrowRight") {
             event.preventDefault();
@@ -168,7 +177,8 @@ export function FeeDerivation() {
       ) : null}
 
       <p className="border-t border-border px-5 py-3 font-mono text-[11.5px] leading-[1.5] text-text-muted">
-        this swap pays {num(feePaidOut, outToken.decimals)} {outToken.symbol} in fees
+        {driftIsLive ? "live drift, read from the hook" : "drift simulated"} · this swap pays{" "}
+        {num(feePaidOut, outToken.displayDecimals)} {outToken.symbol} in fees
       </p>
     </section>
   );

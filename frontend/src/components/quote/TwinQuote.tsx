@@ -1,6 +1,9 @@
 "use client";
 
 import { useAssay } from "@/components/Providers";
+import { useSwapQuote } from "@/hooks/useSwapQuote";
+import { useLiveProtocol } from "@/hooks/useLiveProtocol";
+import { quote } from "@/lib/protocol/feeBlend";
 import { pipsToBp } from "@/lib/format";
 
 /**
@@ -12,7 +15,11 @@ import { pipsToBp } from "@/lib/format";
  * `test/integration/DynamicPricing.t.sol`.
  */
 export function TwinQuote() {
-  const { drift, feePips, twinFeePips, tone } = useAssay();
+  const { tone } = useAssay();
+  // "Right now" has to mean the live pool, not a random walk running beside it.
+  const { drift, feePips, referenceFresh } = useSwapQuote();
+  const { bounds } = useLiveProtocol();
+  const twinFeePips = quote(-drift, referenceFresh, bounds);
   const spread = (feePips - twinFeePips) / 100;
 
   return (

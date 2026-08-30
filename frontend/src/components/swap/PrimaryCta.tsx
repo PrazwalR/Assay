@@ -32,6 +32,13 @@ const STAGES: Record<SwapStage, Appearance> = {
     foreground: "var(--color-bg)",
     actionable: true,
   },
+  loading: {
+    label: () => "Reading the pool…",
+    background: "var(--color-surface-4)",
+    foreground: "var(--color-text-muted)",
+    actionable: false,
+    busy: true,
+  },
   "enter-amount": {
     label: () => "Enter an amount",
     background: "var(--color-surface-4)",

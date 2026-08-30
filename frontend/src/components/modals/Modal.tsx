@@ -20,14 +20,50 @@ export function Modal({
   const panel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Moving focus into the panel is what makes Escape and Tab behave for keyboard users; a
-    // modal that leaves focus behind it is a modal only for people using a mouse.
-    panel.current?.focus();
+    const node = panel.current;
+
+    // Captured before anything below moves focus. Reading it afterwards would record the panel
+    // itself and "restoring" would be a no-op — the bug this ordering exists to avoid.
+    // An autofocused child has already taken focus by now (React applies `autoFocus` in the
+    // layout phase, before this passive effect), so in that case this is the element that
+    // opened the modal, which is exactly what we want to return to.
+    const opener = node?.contains(document.activeElement)
+      ? null
+      : (document.activeElement as HTMLElement | null);
+
+    // Focus the panel only when nothing inside already took it. Focusing unconditionally stole
+    // the caret out of the search and token inputs and left them untypeable.
+    if (node && !node.contains(document.activeElement)) node.focus();
 
     const { overflow } = document.body.style;
     document.body.style.overflow = "hidden";
+
+    // Without a trap, Tab walks straight out of the dialog into the header and footer behind
+    // the scrim, which are still clickable. `aria-modal` alone does not stop that.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab" || !panel.current) return;
+      const focusable = panel.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+
     return () => {
       document.body.style.overflow = overflow;
+      document.removeEventListener("keydown", onKeyDown);
+      // Returning focus where it came from, rather than dropping it on <body> and sending
+      // keyboard users back to the top of the document after every modal.
+      opener?.focus?.();
     };
   }, []);
 
@@ -35,7 +71,12 @@ export function Modal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-5"
       style={{ animation: "assayRise 0.18s ease" }}
-      onClick={onClose}
+      // Dismiss only when the press *started* on the scrim. `click` fires on the common ancestor
+      // of press and release, so a text selection dragged out of the panel would otherwise close
+      // the dialog mid-gesture.
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
       <div
         ref={panel}
@@ -43,7 +84,6 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        onClick={(event) => event.stopPropagation()}
         style={{
           maxWidth: width,
           animation: "assayRise 0.26s cubic-bezier(.22,1,.36,1)",
