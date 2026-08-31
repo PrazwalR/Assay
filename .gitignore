@@ -20,7 +20,7 @@ __pycache__/
 .ruff_cache/
 .ipynb_checkpoints/
 
-*.md
+.pytest_cache/
 
 lcov.info
 
