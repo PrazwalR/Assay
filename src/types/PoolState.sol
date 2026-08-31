@@ -9,8 +9,10 @@ pragma solidity 0.8.26;
 ///        uint32 lastBlock       32    block number the current period belongs to
 ///        bool   referenceFresh   8    whether the cached reference is usable
 ///        int64  twapTickX32     64    Q32.32 EWMA of the block-open tick; PoolTwap's anchor
+///        uint32 lastRefreshAt   32    wall clock of the last boundary refresh
+///        uint32 distrustedUntil 32    wall clock until which the reference is not trusted
 ///                              ---
-///                              152 used, 104 free
+///                              216 used, 40 free
 ///
 ///      Native packing is used rather than hand-rolled shifts so that sign extension of the
 ///      signed fields is the compiler's responsibility. `test_PoolState_OccupiesExactlyOneSlot`
@@ -25,4 +27,6 @@ struct PoolState {
     uint32 lastBlock;
     bool referenceFresh;
     int64 twapTickX32;
+    uint32 lastRefreshAt;
+    uint32 referenceDistrustedUntil;
 }

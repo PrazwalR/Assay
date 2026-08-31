@@ -28,7 +28,15 @@ contract PoolStateTest is Test {
     function test_PoolState_OccupiesExactlyOneSlot() public {
         PoolStateLayoutProbe probe = new PoolStateLayoutProbe();
         probe.setB(
-            PoolState({lastTick: 1, referenceTick: 2, lastBlock: 3, referenceFresh: true, twapTickX32: 4})
+            PoolState({
+                lastTick: 1,
+                referenceTick: 2,
+                lastBlock: 3,
+                referenceFresh: true,
+                twapTickX32: 4,
+                lastRefreshAt: 5,
+                referenceDistrustedUntil: 6
+            })
         );
 
         assertEq(

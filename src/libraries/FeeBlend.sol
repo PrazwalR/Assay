@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {Mispricing} from "./Mispricing.sol";
+
 /// @notice Turns a swap's signed mispricing into the fee it should be quoted.
 /// @dev The mechanism is the no-arbitrage band, not a fitted model. An arbitrageur profits
 ///      only when the drift they capture exceeds what they pay to capture it, so a fee set
@@ -20,9 +22,11 @@ pragma solidity 0.8.26;
 library FeeBlend {
     /// @dev Bound applied to the drift before it is scaled. `Mispricing` already clamps to
     ///      this, but the parameter is a plain int256 and this function runs on the swap
-    ///      path, so the bound is enforced here too rather than assumed of the caller. Without
-    ///      it the scaling below overflows near the extremes of the type and reverts the swap.
-    int256 internal constant MAX_DRIFT_TICKS = 200_000;
+    ///      path, so the bound is enforced here too rather than assumed of the caller.
+    ///      Without it the scaling below overflows near the extremes of the type. Taken from
+    ///      `Mispricing` rather than restated: two matching literals in two files is not a
+    ///      guarantee that they match.
+    int256 internal constant MAX_DRIFT_TICKS = Mispricing.MAX_MISPRICING_TICKS;
 
     /// @dev One tick is one basis point of price, and fees are quoted in hundredths of a
     ///      basis point, so a tick of drift is worth 100 pips of fee.
@@ -36,7 +40,22 @@ library FeeBlend {
     ///      does with the result, keeps a later token-amount multiplication provably safe
     ///      regardless of how extreme the input drift is -- the same defence this codebase
     ///      has needed in three other libraries already.
-    uint24 internal constant MAX_OVERFLOW_PIPS = 1_000_000;
+    /// @dev One hundred percent, in the hundredths-of-a-bip unit every fee here is
+    ///      expressed in. This is the scale the surcharge percentage is measured against,
+    ///      not a bound on it -- `MAX_OVERFLOW_PIPS` below is the bound.
+    uint24 internal constant PIPS_DENOMINATOR = 1_000_000;
+
+    /// @dev Ceiling on the toxicity surcharge, as a share of the swap's notional.
+    ///
+    ///      This was previously `PIPS_DENOMINATOR` itself, which meant the surcharge was
+    ///      bounded only at 100% of notional -- a bound in name only, and one no integrator
+    ///      could price against. The surcharge exists to catch dislocations too large for a
+    ///      percentage fee to express, which for the deployed configuration begins at
+    ///      roughly 950 ticks of drift (a ~10% price move). At 2% this still covers that
+    ///      case and everything up to ~35% of price movement before binding, while capping
+    ///      what any single swap can be charged beyond the LP fee -- and, with it, what an
+    ///      attacker who manufactures drift can extract from the swap that follows theirs.
+    uint24 internal constant MAX_OVERFLOW_PIPS = 20_000;
 
     /// @dev The share-of-drift computation shared by `quote` and `ceilingOverflowPips`, kept
     ///      in one place so the two can never compute the surcharge differently.

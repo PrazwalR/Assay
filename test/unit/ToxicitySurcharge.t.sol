@@ -98,13 +98,13 @@ contract ToxicitySurchargeTest is Test {
     /// @dev The rounding direction, stated over the whole domain: the amount taken is never
     ///      less than the exact share of notional the overflow calls for. Compared in scaled
     ///      integers so the exact value is never itself rounded. `notional` is a uint128 and
-    ///      `overflowPips` is at most 1e6, so neither product can overflow a uint256.
+    ///      `overflowPips` is at most `PIPS_DENOMINATOR`, so neither product overflows.
     function testFuzz_SurchargeAmount_NeverRoundsDown(uint128 notional, uint24 overflowPips) public pure {
         overflowPips = uint24(bound(overflowPips, 0, FeeBlend.MAX_OVERFLOW_PIPS));
         uint256 amount = ToxicitySurcharge.surchargeAmount(notional, overflowPips);
 
         assertGe(
-            amount * FeeBlend.MAX_OVERFLOW_PIPS,
+            amount * FeeBlend.PIPS_DENOMINATOR,
             uint256(notional) * overflowPips,
             "surcharge fell below the exact share of notional"
         );

@@ -36,6 +36,20 @@ interface IAssayEvents {
     /// @param inCurrency0 Whether that currency was `key.currency0`.
     event ToxicitySurchargeDonated(PoolId indexed poolId, uint256 amount, bool inCurrency0);
 
+    /// @notice Emitted when wall-clock time advanced far more than the block count can
+    ///         explain, which on a single-sequencer chain means production stopped.
+    /// @dev Worth its own event rather than folding into `ReferenceFreshnessChanged`: the
+    ///      pool is not reacting to anything it observed about the feed, it is reacting to
+    ///      the chain itself having been absent, and that is the condition an operator wants
+    ///      to correlate against a sequencer status page.
+    /// @param poolId The pool that observed the gap.
+    /// @param secondsElapsed Wall-clock seconds since the last boundary refresh.
+    /// @param blocksElapsed Blocks produced across that same span.
+    /// @param distrustedUntil Wall clock until which the reference is treated as unusable.
+    event ChainHaltDetected(
+        PoolId indexed poolId, uint256 secondsElapsed, uint256 blocksElapsed, uint32 distrustedUntil
+    );
+
     /// @notice Emitted when the reference source reported a usable reading, but it was
     ///         rejected for disagreeing with the pool's own smoothed tick by more than the
     ///         configured cap. The pool is treated as if the reference were stale.

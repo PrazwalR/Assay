@@ -54,6 +54,28 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     uint24 private immutable MAX_REFERENCE_DEVIATION_TICKS;
     uint64 private immutable TWAP_LAMBDA_X32;
 
+    /// @dev Gas ceiling on the reference read. Without one, an oracle that burns gas rather
+    ///      than reverting consumes 63/64 of whatever the swapper supplied, leaving too
+    ///      little to finish `afterSwap` -- turning a degradation into a failed swap for
+    ///      every first-of-block trade. The honest read measures ~21,000 gas.
+    uint256 private constant ORACLE_READ_GAS_LIMIT = 150_000;
+
+    /// @dev Wall-clock seconds per block above which the chain is treated as having halted
+    ///      rather than merely being quiet. Deliberately far above any real chain's cadence
+    ///      (Base produces a block every ~2s) so this cannot misfire on ordinary jitter, and
+    ///      so the same constant holds if this hook is deployed to a slower chain.
+    uint256 private constant MAX_SECONDS_PER_BLOCK = 30;
+
+    /// @dev Absolute slack on the halt test, so a single late block is never a halt.
+    uint256 private constant HALT_GRACE_SECONDS = 90;
+
+    /// @dev How long the reference stays distrusted after a halt is observed. A halted chain
+    ///      freezes the pool's tick and the feed's `updatedAt` together, so on resumption the
+    ///      two still agree with each other while both disagree with the world -- the drift
+    ///      reads as zero at exactly the moment it is largest. This window holds the quote at
+    ///      the ceiling until the feed has had time to post a reading from after the halt.
+    uint256 private constant POST_HALT_DISTRUST_SECONDS = 180;
+
     mapping(PoolId poolId => PoolState) private _poolState;
 
     /// @notice Deploys the hook against a PoolManager with validated parameters.
@@ -107,6 +129,20 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     /// @return maxFeePips The ceiling of any quoted fee.
     function feeBounds() external view returns (uint24 baseFeePips, uint24 minFeePips, uint24 maxFeePips) {
         return (BASE_FEE_PIPS, MIN_FEE_PIPS, MAX_FEE_PIPS);
+    }
+
+    /// @notice The most this hook can take from a swap beyond the quoted LP fee.
+    /// @dev `feeBounds` describes only the percentage fee the PoolManager collects. On an
+    ///      extreme dislocation the hook additionally takes the part of the uncapped formula
+    ///      that a percentage fee could not express and donates it to in-range liquidity, and
+    ///      that amount is bounded separately. An integrator sizing slippage from `feeBounds`
+    ///      alone would not be sizing against the worst case, so the second bound is exposed
+    ///      beside the first rather than left to be discovered.
+    /// @return maxSurchargePips Ceiling on the surcharge, in hundredths of a bip of the
+    ///         swap's unspecified-currency notional.
+    /// @return maxTotalPips Ceiling on fee and surcharge combined -- the true worst case.
+    function surchargeBounds() external view returns (uint24 maxSurchargePips, uint24 maxTotalPips) {
+        return (FeeBlend.MAX_OVERFLOW_PIPS, MAX_FEE_PIPS + FeeBlend.MAX_OVERFLOW_PIPS);
     }
 
     /// @notice Current microstructure state for a pool.
@@ -173,14 +209,23 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     /// @dev Reads the reference source, tolerating any failure as an unusable reading.
     ///      The oracle interface forbids reverting, but this hook cannot depend on a third
     ///      party honouring that, so the conversion is guarded here as well.
-    function _readReference() private view returns (int24 referenceTick, bool fresh) {
-        try REFERENCE_ORACLE.referenceSqrtPriceX96() returns (uint160 sqrtPriceX96, bool ok) {
+    ///
+    ///      `responded` separates "the oracle answered, and its answer is unusable" from
+    ///      "the call itself failed". The first is a real observation and settles the
+    ///      question for this block. The second is an anomaly -- an out-of-gas sub-call is
+    ///      the reachable one -- and must not be allowed to stand in for the first, or a
+    ///      caller who meters their own gas could retire the block's refresh without ever
+    ///      letting the oracle speak.
+    function _readReference() private view returns (int24 referenceTick, bool fresh, bool responded) {
+        try REFERENCE_ORACLE.referenceSqrtPriceX96{gas: ORACLE_READ_GAS_LIMIT}() returns (
+            uint160 sqrtPriceX96, bool ok
+        ) {
             if (!ok || sqrtPriceX96 < TickMath.MIN_SQRT_PRICE || sqrtPriceX96 >= TickMath.MAX_SQRT_PRICE) {
-                return (0, false);
+                return (0, false, true);
             }
-            return (TickMath.getTickAtSqrtPrice(sqrtPriceX96), true);
+            return (TickMath.getTickAtSqrtPrice(sqrtPriceX96), true, true);
         } catch {
-            return (0, false);
+            return (0, false, false);
         }
     }
 
@@ -233,14 +278,16 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         returns (bytes4)
     {
         PoolId poolId = key.toId();
-        (int24 referenceTick, bool referenceFresh) = _readReference();
+        (int24 referenceTick, bool referenceFresh,) = _readReference();
         int24 seedTick = referenceFresh ? referenceTick : tick;
         _poolState[poolId] = PoolState({
             lastTick: tick,
             referenceTick: seedTick,
             lastBlock: uint32(block.number),
             referenceFresh: referenceFresh,
-            twapTickX32: PoolTwap.seed(seedTick)
+            twapTickX32: PoolTwap.seed(seedTick),
+            lastRefreshAt: uint32(block.timestamp),
+            referenceDistrustedUntil: 0
         });
 
         emit PoolRegistered(poolId, BASE_FEE_PIPS);
@@ -328,7 +375,25 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         // the cost is amortised across a block's swaps -- but the first swap of each block
         // still pays it in full, and that is the hook's most expensive path.
         if (state.lastBlock != uint32(block.number)) {
-            state.lastBlock = uint32(block.number);
+            // Wall clock and block count should advance together. When they do not -- many
+            // seconds passing across very few blocks -- the chain stopped producing rather
+            // than this pool merely being quiet, and a quiet pool is the case this must not
+            // misread: an untraded hour still advances ~1,800 Base blocks, so its ratio is
+            // ordinary. A halt is the opposite shape, and it is the dangerous one, because
+            // it freezes the pool's tick and the feed's `updatedAt` at the same instant.
+            // They then still agree with each other while both disagree with the world, so
+            // the drift reads as zero at exactly the moment it is largest. Subtraction is
+            // done in uint32 so it stays correct across the type's own epoch rollover.
+            uint32 nowTruncated = uint32(block.timestamp);
+            uint256 secondsElapsed = uint256(nowTruncated - state.lastRefreshAt);
+            uint256 blocksElapsed = uint256(uint32(block.number) - state.lastBlock);
+            if (
+                state.lastRefreshAt != 0
+                    && secondsElapsed > blocksElapsed * MAX_SECONDS_PER_BLOCK + HALT_GRACE_SECONDS
+            ) {
+                state.referenceDistrustedUntil = nowTruncated + uint32(POST_HALT_DISTRUST_SECONDS);
+                emit ChainHaltDetected(poolId, secondsElapsed, blocksElapsed, state.referenceDistrustedUntil);
+            }
 
             // `state.lastTick` still holds wherever the pool stood at the end of the
             // previous block: this runs before it is overwritten below with the current
@@ -337,7 +402,24 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
             // moved from inside the same block that needs it to look a certain way.
             state.twapTickX32 = PoolTwap.update(state.twapTickX32, state.lastTick, TWAP_LAMBDA_X32);
 
-            (int24 referenceTick, bool referenceFresh) = _readReference();
+            (int24 referenceTick, bool referenceFresh, bool responded) = _readReference();
+
+            // The block is only retired once the oracle has actually answered. A call that
+            // failed outright -- the reachable case being a caller who metered their gas so
+            // the sub-call ran out -- leaves the refresh owed, so the next swap in this
+            // block tries again on its own gas. Retiring the block on a failed call instead
+            // would let one cheap dust swap per block hold the pool at the ceiling fee
+            // indefinitely while the feed was healthy the whole time.
+            if (responded) {
+                state.lastBlock = uint32(block.number);
+                state.lastRefreshAt = nowTruncated;
+            }
+
+            // Inside the post-halt window nothing the feed says is trusted, however fresh it
+            // claims to be, because the reading may predate the halt.
+            if (referenceFresh && nowTruncated < state.referenceDistrustedUntil) {
+                referenceFresh = false;
+            }
 
             // A reading the oracle itself reports as fresh can still be rejected here: it
             // disagrees with where the pool has actually been trading by more than the

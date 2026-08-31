@@ -57,13 +57,13 @@
     "drift": 5000,
     "share": 2500,
     "quote": 10000,
-    "overflow": 115500
+    "overflow": 20000
   },
   {
     "drift": 200000,
     "share": 2500,
     "quote": 10000,
-    "overflow": 1000000
+    "overflow": 20000
   },
   {
     "drift": -5000,
@@ -123,13 +123,13 @@
     "drift": 5000,
     "share": 5000,
     "quote": 10000,
-    "overflow": 240500
+    "overflow": 20000
   },
   {
     "drift": 200000,
     "share": 5000,
     "quote": 10000,
-    "overflow": 1000000
+    "overflow": 20000
   },
   {
     "drift": -5000,
@@ -183,18 +183,18 @@
     "drift": 400,
     "share": 10000,
     "quote": 10000,
-    "overflow": 30500
+    "overflow": 20000
   },
   {
     "drift": 5000,
     "share": 10000,
     "quote": 10000,
-    "overflow": 490500
+    "overflow": 20000
   },
   {
     "drift": 200000,
     "share": 10000,
     "quote": 10000,
-    "overflow": 1000000
+    "overflow": 20000
   }
 ]

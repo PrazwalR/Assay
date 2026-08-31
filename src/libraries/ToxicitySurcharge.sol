@@ -45,7 +45,8 @@ library ToxicitySurcharge {
 
     /// @notice The surcharge amount to donate, in the unspecified currency.
     /// @dev Total over its input domain: `overflowPips` is already bounded by
-    ///      `FeeBlend.MAX_OVERFLOW_PIPS`, and `FullMath.mulDiv` carries a 512-bit
+    ///      `FeeBlend.MAX_OVERFLOW_PIPS`, the denominator is `PIPS_DENOMINATOR`, and
+    ///      `FullMath.mulDiv` carries a 512-bit
     ///      intermediate, so this cannot overflow regardless of `notional`.
     /// @param notional The unspecified side's swap magnitude, from `unspecifiedAmount`.
     /// @param overflowPips The cap overflow from `FeeBlend.ceilingOverflowPips`, in pips.
@@ -60,6 +61,6 @@ library ToxicitySurcharge {
         // every swap that reaches this path. The bound still holds, because rounding up a
         // quotient whose exact value is at most `notional` cannot exceed `notional` unless
         // the division was already exact, in which case there is nothing to round.
-        return FullMath.mulDivRoundingUp(notional, overflowPips, FeeBlend.MAX_OVERFLOW_PIPS);
+        return FullMath.mulDivRoundingUp(notional, overflowPips, FeeBlend.PIPS_DENOMINATOR);
     }
 }

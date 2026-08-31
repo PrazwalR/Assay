@@ -2,14 +2,14 @@
 .env.*
 !.env.example
 
-out/
-cache/
-broadcast/
-lib/
+/out/
+/cache/
+/broadcast/
+/lib/
 node_modules/
-target/
+/target/
 
-data/
+/data/
 *.parquet
 *.csv
 

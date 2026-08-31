@@ -129,6 +129,8 @@ contract LiveBaseSepoliaForkTest is Test, IAssayEvents {
             poolKey,
             SwapParams({
                 zeroForOne: zeroForOne,
+                // `amountIn` is a small literal set above, far inside int256.
+                // forge-lint: disable-next-line(unsafe-typecast)
                 amountSpecified: -int256(amountIn),
                 sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
             }),

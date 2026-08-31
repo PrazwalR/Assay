@@ -31,6 +31,22 @@ contract ChainlinkReferenceAdapter is IReferencePriceOracle {
     ///      off chain at deployment, so no exponentiation happens at read time.
     uint256 public immutable PRICE_NUMERATOR;
 
+    /// @dev Largest feed answer that `_toSqrtPriceX96` cannot divide by. `FullMath.mulDiv`
+    ///      requires its denominator to exceed the high 256 bits of the product, which for
+    ///      `PRICE_NUMERATOR << 192` is `PRICE_NUMERATOR >> 64`. An answer at or below this
+    ///      makes that call revert -- so it is screened here and reported unusable, keeping
+    ///      the never-reverts contract true in this contract rather than only because the
+    ///      caller happens to wrap it. Chainlink's own `minAnswer` sentinel of 1 sits inside
+    ///      this range for the decimal scaling this adapter is deployed with.
+    uint256 public immutable MIN_DIVISIBLE_ANSWER;
+
+    /// @dev Gas ceiling on the feed call. A feed that burns gas rather than reverting would
+    ///      otherwise consume 63/64 of whatever the swapper supplied and leave too little to
+    ///      finish the swap, turning a graceful degradation into a failed transaction. The
+    ///      honest call measures ~21,000 gas against the live aggregator, so this is roughly
+    ///      five times what a working feed needs.
+    uint256 internal constant FEED_GAS_LIMIT = 100_000;
+
     IAggregatorV3 public immutable FEED;
     uint256 public immutable MAX_AGE_SECONDS;
 
@@ -106,6 +122,7 @@ contract ChainlinkReferenceAdapter is IReferencePriceOracle {
         FEED = feed;
         MAX_AGE_SECONDS = maxAgeSeconds;
         PRICE_NUMERATOR = priceNumerator;
+        MIN_DIVISIBLE_ANSWER = priceNumerator >> 64;
         PRICED_CURRENCY0 = currency0;
         PRICED_CURRENCY1 = currency1;
     }
@@ -133,13 +150,19 @@ contract ChainlinkReferenceAdapter is IReferencePriceOracle {
         // A feed that reverts, returns a non-positive answer, or has stopped updating is a
         // stale reading, not an error. try/catch keeps a misbehaving external contract from
         // propagating a revert into the swap that triggered this read.
-        try FEED.latestRoundData() returns (
+        try FEED.latestRoundData{gas: FEED_GAS_LIMIT}() returns (
             uint80, int256 answer, uint256 startedAt, uint256 updatedAt, uint80
         ) {
             if (answer <= 0 || startedAt == 0 || updatedAt == 0) return (0, false);
-            if (block.timestamp > updatedAt && block.timestamp - updatedAt > MAX_AGE_SECONDS) {
+            // A reading stamped in the future is not evidence of freshness, it is evidence
+            // the feed is wrong about the time. Testing it first also keeps the subtraction
+            // below from underflowing.
+            if (updatedAt > block.timestamp || block.timestamp - updatedAt > MAX_AGE_SECONDS) {
                 return (0, false);
             }
+            // The guard above has established answer > 0, so the cast is exact.
+            // forge-lint: disable-next-line(unsafe-typecast)
+            if (uint256(answer) <= MIN_DIVISIBLE_ANSWER) return (0, false);
             // The guard above has established answer > 0, so the cast is exact.
             // forge-lint: disable-next-line(unsafe-typecast)
             return _toSqrtPriceX96(uint256(answer));
