@@ -10,10 +10,20 @@ figures exclude one-off cold account and storage access, which otherwise swamps 
 
 | path | measured | budget | headroom |
 | --- | --- | --- | --- |
-| ordinary swap | 14,572 | 20,000 | 27% |
-| block boundary, mock feed | 30,901 | — | — |
-| **block boundary, live feed** | **~47,400** | 55,000 | 14% |
-| extreme dislocation (surcharge) | 48,582 | 55,000 | 12% |
+| ordinary swap | 14,920 | 20,000 | 25% |
+| block boundary, mock feed | 34,337 | — | — |
+| **block boundary, live feed** | **50,837** | 55,000 | 8% |
+| extreme dislocation (surcharge) | 49,253 | 55,000 | 10% |
+
+Re-measured against `test/gas/HookOverhead.t.sol` directly (`forge test --match-path
+test/gas/HookOverhead.t.sol -vv`) rather than assumed from the table below: every path costs
+more than it did at the "after" snapshot in **What changed, and why**, because the
+reference-deviation-cap module was added afterward and its check sits on the same
+`afterSwap` path the variance removal shrank. Contract size moved with it: 9,625 bytes at
+that snapshot, 10,811 bytes now (`forge inspect src/AssayHook.sol:AssayHook
+deployedBytecode`, matches the deployed address). The live-feed path's headroom is the one
+worth watching — it dropped from a comfortable 14% to 8% of budget, not because anything
+regressed, but because two real features now share one gas budget that was sized for one.
 
 **The live-feed figure is the one that matters.** Tests read a mock aggregator; a real
 Chainlink read measured **20,774 gas** against the deployed Base Sepolia adapter
