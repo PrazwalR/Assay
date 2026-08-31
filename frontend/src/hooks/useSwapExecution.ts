@@ -95,6 +95,16 @@ export function useSwapExecution(params: {
   // which is what lets every stage below be derived rather than mirrored into more state.
   const [intent, setIntent] = useState<"approve" | "swap" | null>(null);
 
+  // False for a fixed window after an approval confirms, regardless of how fast the allowance
+  // refetch lands. Needed because `approved` is derived from `allowance`, and even an
+  // immediate refetch is a real network round trip — during it, `isSuccess` is already true
+  // but `approved` is still stale-false, which without this flag falls through to
+  // "needs-approval" and shows a clickable Approve button for that window. Starts `true`
+  // ("no cooldown pending") and is set `false` in `approve()` itself — an event handler, not
+  // an effect — so the effect below only ever needs to flip it back, from inside a timer
+  // callback, never synchronously in its own body.
+  const [approveCooldownElapsed, setApproveCooldownElapsed] = useState(true);
+
   const tokenIn = TOKENS[tokenInSymbol];
   const zeroForOne = isZeroForOne(tokenInSymbol);
 
@@ -128,15 +138,30 @@ export function useSwapExecution(params: {
   }, [intent, isSuccess, onConfirmed]);
 
   // Without this, `allowance` only updates on its 3s poll tick, which is on its own clock, not
-  // triggered by confirmation. In the gap, `approved` is still stale-false while `isMining` and
-  // `isSuccess` have already flipped, so the stage below falls through to "needs-approval" and
-  // shows a clickable Approve button that would fire a second on-chain approval.
+  // triggered by confirmation. Refetching immediately closes most of the gap; the cooldown
+  // timer below closes the rest of it, since even an immediate refetch is a real round trip.
   useEffect(() => {
     if (intent === "approve" && isSuccess) void refetchAllowance();
   }, [intent, isSuccess, refetchAllowance]);
 
+  // A fixed backstop, not a timing guess: whatever the refetch's actual latency turns out to
+  // be, the button stays locked for this whole window regardless. The `approveCooldownElapsed`
+  // guard keeps this from rescheduling once it has already fired for the current approval; the
+  // state update itself happens inside the timer's callback, never synchronously in the effect
+  // body. Re-fetches once more at the end in case the first attempt raced a node that hadn't
+  // indexed the new allowance yet.
+  useEffect(() => {
+    if (intent !== "approve" || !isSuccess || approveCooldownElapsed) return;
+    const timer = setTimeout(() => {
+      setApproveCooldownElapsed(true);
+      void refetchAllowance();
+    }, 4_000);
+    return () => clearTimeout(timer);
+  }, [intent, isSuccess, approveCooldownElapsed, refetchAllowance]);
+
   const approve = useCallback(() => {
     setIntent("approve");
+    setApproveCooldownElapsed(false);
     writeContract({
       address: tokenIn.address,
       abi: ERC20_ABI,
@@ -182,6 +207,7 @@ export function useSwapExecution(params: {
 
   const reset = useCallback(() => {
     setIntent(null);
+    setApproveCooldownElapsed(true);
     resetWrite();
     void refetchAllowance();
   }, [resetWrite, refetchAllowance]);
@@ -200,7 +226,13 @@ export function useSwapExecution(params: {
     // Only while an approval is genuinely outstanding. Previously this branch tested `!approved`
     // alone, which meant any later edit — flipping direction, changing token, clearing the
     // amount — re-entered a stage with no action and no exit but a page reload.
-    if (intent === "approve" && !approved && (isMining || !isSuccess)) return "approving";
+    // `!approveCooldownElapsed` covers the gap `isSuccess` alone misses: `approved` derives
+    // from `allowance`, and even an immediate refetch is a real network round trip. Without
+    // this, that round trip read as "needs-approval" and showed a clickable Approve button
+    // that would fire a second on-chain approval before the first had visibly landed.
+    if (intent === "approve" && !approved && (isMining || !isSuccess || !approveCooldownElapsed)) {
+      return "approving";
+    }
     if (amountIn <= 0n) return "enter-amount";
     if (balanceIn !== undefined && amountIn > balanceIn) return "insufficient-balance";
     // Distinguished from "no amount entered": a failed or pending allowance read used to render
