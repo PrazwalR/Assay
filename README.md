@@ -14,7 +14,8 @@ are quoted differently. Measured in `test/integration/DynamicPricing.t.sol`: **1
 
 ## Status
 
-Unaudited, and never having held value. Base Sepolia only.
+Unaudited, and never having held value. Base Sepolia only. All four addresses below are
+source-verified on Basescan.
 
 | | |
 | --- | --- |
