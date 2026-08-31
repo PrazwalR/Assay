@@ -427,8 +427,9 @@ function NotBuilt() {
       </P>
       <P>
         On the interface side: pools, positions, portfolio and activity surfaces are not built,
-        there is no light theme, and swap execution is not wired — the pool exists and is
-        tradeable, but this interface does not build the v4 unlock and settle callbacks.
+        and there is no light theme. Swap execution is real — the SwapCard drives the actual
+        approve-then-swap flow against the live pool — but the Simulation surface&rsquo;s demo
+        controls (replay speed, a developer/calldata view, presentation mode) are not.
       </P>
     </>
   );

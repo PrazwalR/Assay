@@ -62,9 +62,8 @@ export function WalletModal() {
         ) : null}
 
         <p className="mt-4 text-[11.5px] leading-[1.55] text-text-muted">
-          Connecting is real and reads your live Base Sepolia balance. Swapping from the
-          browser is not wired yet — the pool exists and is tradeable, but this interface does
-          not build the v4 unlock and settle callbacks.
+          Connecting is real and reads your live Base Sepolia balance. Swapping from the browser
+          is real too — approve, then swap, against the live pool.
         </p>
       </div>
     );

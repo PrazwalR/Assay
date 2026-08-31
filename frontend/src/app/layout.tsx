@@ -22,7 +22,15 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+// Resolves `opengraph-image`'s meta tag to an absolute URL, which link unfurling requires and
+// a relative path silently fails at. Prefers an explicit custom domain, falls back to Vercel's
+// own deployment URL, then localhost for `pnpm dev`.
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Assay — per-swap adverse selection pricing",
   description:
     "A Uniswap v4 hook that prices each swap on the drift it captures against a cached reference, signed by direction — rather than charging every swap in a block the same volatility-derived rate.",

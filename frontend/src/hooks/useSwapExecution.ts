@@ -127,6 +127,14 @@ export function useSwapExecution(params: {
     if (intent === "swap" && isSuccess) onConfirmed();
   }, [intent, isSuccess, onConfirmed]);
 
+  // Without this, `allowance` only updates on its 3s poll tick, which is on its own clock, not
+  // triggered by confirmation. In the gap, `approved` is still stale-false while `isMining` and
+  // `isSuccess` have already flipped, so the stage below falls through to "needs-approval" and
+  // shows a clickable Approve button that would fire a second on-chain approval.
+  useEffect(() => {
+    if (intent === "approve" && isSuccess) void refetchAllowance();
+  }, [intent, isSuccess, refetchAllowance]);
+
   const approve = useCallback(() => {
     setIntent("approve");
     writeContract({
