@@ -30,8 +30,12 @@ jobs:
       - name: Build
         run: forge build --sizes
 
+      # test/fork excluded: it forks live Base Sepolia state, which the rest of this job
+      # cannot depend on. A flaky public RPC would fail CI for a reason unrelated to code
+      # correctness, and its gas cost isn't stable to snapshot since it depends on real,
+      # changing on-chain state. It runs as its own non-blocking job below instead.
       - name: Test
-        run: forge test -vvv
+        run: forge test -vvv --no-match-path "test/fork/*"
 
       # Invariants run separately from the unit suite: they are slower, and a failure here
       # means a property broke across a sequence rather than in a single case, which is worth
@@ -41,10 +45,11 @@ jobs:
 
       # Gas tests are excluded: coverage instrumentation inflates gas, so their assertions
       # measure the instrumented build rather than the shipped one. They gate in the test
-      # step instead.
+      # step instead. Fork tests are excluded for the same reason as the Test step above --
+      # network access, not instrumentation, but the same "don't run here" conclusion.
       - name: Coverage
         run: |
-          forge coverage --report lcov --report-file lcov.info             --no-match-coverage "(script|test)" --no-match-path "test/gas/*"
+          forge coverage --report lcov --report-file lcov.info             --no-match-coverage "(script|test)" --no-match-path "test/(gas|fork)/*"
           python3 - <<'CHECK'
           import re, sys
           hit = found = 0
@@ -59,12 +64,35 @@ jobs:
 
       # Fuzz and invariant gas is a function of run count and seed, and the ci profile runs
       # more fuzz iterations than the default one. Snapshotting them can never be stable, so
-      # the snapshot covers deterministic tests only. Keep this filter identical to the one
-      # used locally or the check will drift again.
+      # the snapshot covers deterministic tests only. Fork tests are excluded too: their gas
+      # depends on real, changing on-chain state, which is exactly the same instability
+      # problem. Keep this filter identical to the one used locally or the check will drift
+      # again.
       - name: Gas snapshot
         run: |
-          forge snapshot --check --no-match-test "testFuzz|invariant" \
-            || (echo "gas changed; regenerate with: forge snapshot --no-match-test \"testFuzz|invariant\"" && exit 1)
+          forge snapshot --check --no-match-test "testFuzz|invariant" --no-match-path "test/fork/*" \
+            || (echo "gas changed; regenerate with: forge snapshot --no-match-test \"testFuzz|invariant\" --no-match-path \"test/fork/*\"" && exit 1)
+
+  # Runs against live Base Sepolia state rather than a local deployment -- the strongest
+  # available check that the deployed bytecode still agrees with this checkout, but at the
+  # cost of depending on a third-party RPC's uptime. Separate and non-blocking so a public
+  # RPC hiccup surfaces as a visible, ignorable line rather than failing every PR.
+  fork:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Fork test (live Base Sepolia)
+        run: forge test --match-path "test/fork/*" -vv
+        env:
+          BASE_SEPOLIA_RPC_URL: ${{ secrets.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org' }}
 
   analysis:
     runs-on: ubuntu-latest
