@@ -115,7 +115,9 @@ contract SeedActivity is Script {
         address liquidityRouter,
         address swapRouter
     ) private {
-        if (wrapAmount1 > 0) IWETH(Currency.unwrap(currency1)).deposit{value: wrapAmount1}();
+        if (wrapAmount1 > 0) {
+            IWETH(Currency.unwrap(currency1)).deposit{value: wrapAmount1}();
+        }
 
         IERC20Minimal(Currency.unwrap(currency0)).approve(liquidityRouter, type(uint256).max);
         IERC20Minimal(Currency.unwrap(currency1)).approve(liquidityRouter, type(uint256).max);
