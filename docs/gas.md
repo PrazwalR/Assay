@@ -62,8 +62,8 @@ Recovered specifically: one `getLiquidity` external call (415), the order-flow a
   not with the arithmetic.
 - **Lookup tables must live in bytecode, not storage.** A cold `SLOAD` is 2,100 gas; a
   `bytes constant` read via `CODECOPY` is roughly 3 gas per word.
-- **`PoolState` is 88 of 256 bits.** Fields can be added without a second slot, but a field
-  pushed past 256 silently adds an `SLOAD` and an `SSTORE` to the hot path.
+- **`PoolState` is 248 of 256 bits.** Only 8 bits remain, so a new field almost certainly needs
+  a second slot, which silently adds an `SLOAD` and an `SSTORE` to the hot path.
   `test_PoolState_OccupiesOneStorageSlot` asserts the layout.
 - **Gas tests are excluded from `forge coverage`.** Coverage instrumentation inflates gas, so
   the assertions would measure the instrumented build rather than the shipped one.

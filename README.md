@@ -32,10 +32,13 @@ running code yourself rather than trusting this document. The current source com
 
 **The adverse-selection gate does not currently pass.** The pre-declared bar for this project
 was that the mechanism demonstrably improves liquidity-provider outcomes, measured against a
-classifier trained on real swap data. It doesn't clear that bar yet: AUC came in at 0.7485
-against a 0.75 floor, on 91 positive examples against a floor of 100, with the weakest
-walk-forward fold at 0.469 against a floor of 0.60. Small sample, not enough evidence either
-way. The mechanism is implemented, tested, and running; the claim that it's worth deploying
+classifier trained on real swap data. The gate is a conjunction of five criteria and it fails
+on two of them: 91 positive examples against a floor of 100, and the weakest walk-forward fold
+at 0.469 against a floor of 0.60. The headline AUC of 0.7485 **clears** its own 0.65 floor
+(`calibration/assay_calib/config.py`) — earlier revisions of this file described that floor as
+0.75, which was never the configured value. Small sample, not enough evidence either way.
+
+The mechanism is implemented, tested, and running; the claim that it's worth deploying
 with real capital is not established, and this document does not make that claim. Full
 writeup on the Risk page in the app's docs (`frontend/src/components/docs/pages.tsx`, the
 `Risk` component; served at `/docs/risk`).
@@ -281,9 +284,15 @@ set at all).
 (`docs/audit/`), and one 8-checklist parallel pass (`audits/Assay-2026-08-31/`) covering
 general correctness, precision math, AMM-specific patterns, oracle security, chain-specific
 quirks, access control, denial-of-service, and flash-loan attack vectors — eight independent
-specialist reviews synthesized into one report. That pass found the most consequential bug in
-this project's history (below), plus five others, all fixed with a regression test each in
-`test/integration/AuditFixes.t.sol`.
+specialist reviews synthesized into one report. All three passes were agent-driven; no
+third-party human review has been done.
+
+That pass found the most consequential bug in this project's history (below), plus five others.
+Five of the six are fixed with a regression test each in `test/integration/AuditFixes.t.sol`.
+**One remains open:** the JIT-liquidity tick-manipulation finding (H-2). The reference-deviation
+cap gates which oracle readings are *adopted*; it does not bound the live `lastTick` the fee
+formula actually consumes, and `Mispricing.MAX_MISPRICING_TICKS` (200,000) is ten times looser
+than the deviation cap (20,000). No regression test covers it.
 
 ### History
 
@@ -300,9 +309,13 @@ numbers before and after, and the commit history for the full account, including
 the fix itself introduced and a second pass caught before it shipped
 (`test_Regression_TwapDoesNotFoldSameBlockTickWhileOracleIsStuck`).
 
-This is worth sitting with for a moment: **the failing P0 gate above may be measuring a bug
-that no longer exists.** The calibration run behind that AUC number predates this fix.
-Re-running it against the corrected mechanism is the natural next step, not yet done.
+One clarification, because an earlier revision of this file got it wrong: **the failing P0 gate
+is not measuring this bug, and re-running it would not change the numbers.** The calibration
+pipeline reads historical Uniswap v3 swaps on Ethereum mainnet against Binance candles — it
+never loads this hook, this pool, or this chain. It answers the prior question of whether
+adverse selection is predictable per swap at all. What actually blocks the gate is the
+labelling: a 30-second markout is partly tautological with the mispricing feature by
+construction, so a longer horizon or a drift-netting label is the work, not a re-run.
 
 ### Gas
 
@@ -325,7 +338,7 @@ when the reference-refresh fix above landed, in [`docs/gas.md`](docs/gas.md).
 ### Tests
 
 ```bash
-forge test                                    196 tests, ~26 suites
+forge test                                    193 tests, 26 suites
 forge test --match-path "test/invariant/*"    7 stateful properties, 8,192 calls each
 forge test --match-path "test/fork/*"         3 tests against the live deployment above
 ```

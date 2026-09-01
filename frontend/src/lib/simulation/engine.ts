@@ -127,7 +127,7 @@ export function buildScenario(
     return {
       ...emptyScenario(input, initial, referenceUsd, referenceTick),
       unavailable:
-        "That dislocation is larger than the pool's seeded range. Reduce the size — this pool holds roughly 38 USDC of depth.",
+        "That dislocation is larger than the pool's seeded range. Reduce the size — this pool holds only tens of dollars of depth.",
     };
   }
 

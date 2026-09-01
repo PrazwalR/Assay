@@ -2,15 +2,15 @@
  * The constant-product curve, in the exact integer arithmetic v4 uses.
  *
  * This replaced a quote derived from a spot USD price ratio, which carried no price-impact term
- * at all. On this pool — roughly 38 USDC of depth — that overstated the output by 4% at the
- * page's default size and 28% at the deployer's full balance, and the "Minimum received" figure
- * printed underneath was above what the chain would actually pay. A quote that cannot be
- * executed is worse than no quote.
+ * at all. On a pool this shallow that overstated the output by 4% at the page's default size and
+ * 28% at the deployer's full balance, and the "Minimum received" figure printed underneath was
+ * above what the chain would actually pay. A quote that cannot be executed is worse than no
+ * quote.
  *
  * Exactness: `computeSwapStep` below reproduces v4's `SwapMath` for a swap that stays inside one
- * liquidity range. The pool has exactly one position, spanning ticks 192240–204240, so liquidity
- * is constant across that whole span and this is exact rather than approximate — verified to the
- * wei against a live `PoolSwapTest` simulation. `crossesRange` reports when that assumption
+ * liquidity range. The pool's liquidity sits in a single range spanning ticks 192180–204180, so
+ * liquidity is constant across that whole span and this is exact rather than approximate —
+ * verified to the wei against a live `PoolSwapTest` simulation. `crossesRange` reports when that assumption
  * stops holding, so the caller can decline to quote rather than quote wrongly.
  *
  * Everything is `bigint`. Uniswap's rounding directions are reproduced deliberately: each is

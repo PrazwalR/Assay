@@ -165,10 +165,12 @@ the safe direction and is not a position anyone profits from.
 - `captureShareBps` is calibrated conservatively but its underlying elasticity is bounded
   rather than measured. See the Risk page in the app's docs (`frontend/src/components/docs/pages.tsx`,
   the `Risk` component; served at `/docs/risk`).
-- The adverse-selection gate does not currently pass: AUC came in at 0.7485 against a 0.75
-  floor, on 91 positive examples against a floor of 100, with the weakest walk-forward fold at
-  0.469 against a floor of 0.60. The mechanism is correct; the evidence that it improves
-  liquidity-provider outcomes is not yet established. Full writeup at the Risk page above.
+- The adverse-selection gate does not currently pass. It fails on two of its five criteria:
+  91 positive examples against a floor of 100, and the weakest walk-forward fold at 0.469
+  against a floor of 0.60. The AUC of 0.7485 clears its own floor, which is 0.65 and not the
+  0.75 earlier revisions of this file claimed. The mechanism is correct; the evidence that it
+  improves liquidity-provider outcomes is not yet established. Full writeup at the Risk page
+  above.
 - **No independent adversarial review has been completed.** Reentrancy through `donate`, and
   cross-swap fee manipulation via the tick recorded in `afterSwap`, have been reasoned about
   and partially mutation-tested but not audited by a third party.

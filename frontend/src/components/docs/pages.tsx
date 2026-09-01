@@ -309,9 +309,10 @@ function Risk() {
       <Callout tone="warm" title="The adverse-selection gate does not pass">
         <p className="mb-2">
           The pre-declared gate for this project was that the mechanism demonstrably improves
-          liquidity-provider outcomes. It does not currently pass. The classifier&apos;s area
-          under the curve came in at 0.7485 against a 0.75 floor, on 91 positive examples against
-          a floor of 100, with the weakest walk-forward fold at 0.469 against a floor of 0.60.
+          liquidity-provider outcomes. It does not currently pass. The gate is a conjunction of
+          five criteria and it fails on two: 91 positive examples against a floor of 100, and
+          the weakest walk-forward fold at 0.469 against a floor of 0.60. The classifier&apos;s
+          area under the curve, 0.7485, clears its own floor of 0.65.
         </p>
         <p>
           The mechanism is implemented, tested and deployed. The evidence that it is worth
@@ -335,10 +336,23 @@ function Risk() {
           errors, not a subtly wrong value inside the tolerance.
         </li>
         <li>
-          <strong className="text-text">No L2 sequencer uptime check.</strong> Analysed and
-          accepted: the aggregator cannot update while the sequencer is down, so the existing
-          staleness check fires and the pool over-charges rather than under-charges. The residual
-          cost is a window of ceiling-priced swaps after a restart.
+          <strong className="text-text">No L2 sequencer uptime feed.</strong> An earlier version
+          of this page argued the omission was safe because a down sequencer stops the
+          aggregator updating, so staleness fires and the pool over-charges. That reasoning was
+          wrong, and is retracted: it only holds once an outage exceeds the staleness bound. A
+          shorter outage freezes the pool tick and the feed&apos;s timestamp together, so on
+          resumption they still agree with each other while both disagree with the world — the
+          drift reads as zero at exactly the moment it is largest, which is{" "}
+          <em>under</em>-charging. The hook now detects this directly by comparing wall clock
+          against block production and distrusting the reference for a fixed window afterward.
+          That is narrower than reading the uptime feed and does not replace it.
+        </li>
+        <li>
+          <strong className="text-text">One High audit finding is open.</strong> A JIT liquidity
+          provider who can order their own swap ahead of a pending one can manufacture apparent
+          drift for that swap and collect the inflated surcharge as the dominant in-range LP.
+          The deviation cap gates which Chainlink readings are adopted; it does not bound the
+          live pool tick the fee formula consumes. No regression test covers this yet.
         </li>
         <li>
           <strong className="text-text">Aggregator circuit breakers unchecked.</strong>{" "}
@@ -408,8 +422,9 @@ function NotBuilt() {
         gas.
       </P>
       <P>
-        They were removed from the swap path. The libraries remain in the tree, pure and tested,
-        for a milestone that can show they earn their cost. Two earlier errors had hidden this
+        They were removed from the swap path, and then from the tree entirely — recoverable from
+        git history if a milestone can show they earn their cost. Deleting them cut 3,268 gas
+        from every swap and 1,713 bytes from the contract. Two earlier errors had hidden this
         result — a markout horizon that silently resolved to a wider window than intended, and a
         comparison of univariate rather than incremental discrimination.
       </P>
