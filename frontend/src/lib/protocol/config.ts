@@ -13,12 +13,13 @@ export const BASE_SEPOLIA_CHAIN_ID = 84_532;
 
 export const CONTRACTS = {
   /**
-   * Deployed from the current source: 10,811 bytes on chain against 10,811 compiled, so the
-   * deviation cap and everything else the audit covers is what is actually running. The
-   * previous deployment at 0xa3A9901c… was 9,625 bytes and predated that work.
+   * Deployed from the audited source: reference now refreshes in `beforeSwap`, the surcharge
+   * is capped at 2% of notional, the oracle read carries a gas stipend, and a stuck chain is
+   * detected and distrusted. 12,203 bytes on chain against 12,203 compiled. The previous
+   * deployment at 0x4A20EB2C… predates all of it — see `audits/` and `SECURITY.md`.
    */
-  hook: "0x4A20EB2C6B928d4c153E4cDe2D7011ead9fCb0c4",
-  oracleAdapter: "0xFA99bbD088EEc136b626aE98003240F12e851f98",
+  hook: "0xc825ad661BA0398eF9Cf809E6635528C9aa370c4",
+  oracleAdapter: "0x56757460c56104aBD30a7783e7Ac0dcE380F0d38",
   chainlinkEthUsd: "0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1",
 } as const;
 
@@ -27,7 +28,7 @@ export const CONTRACTS = {
  * exists, because the hook refuses any pair its oracle does not price.
  */
 export const POOL = {
-  id: "0xbb01cc76d59b8baa0df9cabb9751df62d23adc3b4ad38f59822cd09be74707c2",
+  id: "0x1b4f8ca171d62e2acd6c815e4607e9ff771d48a2e540ec7cc12e0e1c984684ee",
   currency0: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
   currency1: "0x4200000000000000000000000000000000000006",
   tickSpacing: 60,
@@ -44,11 +45,11 @@ export const POOL_MANAGER = "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408" as cons
  * The single seeded position's tick range, from `script/SetupPool.s.sol`. Liquidity is constant
  * across it, which is what makes a single-range curve quote exact rather than approximate.
  */
-export const POOL_RANGE = { tickLower: 192_240, tickUpper: 204_240 } as const;
+export const POOL_RANGE = { tickLower: 192_180, tickUpper: 204_180 } as const;
 
 export const ROUTERS = {
-  swap: "0x689E091c7411dB859915E3D8e9b37aee1dC343Ef",
-  liquidity: "0xA0a08ed6bBa5c790c8FF296DE5006ffC672d8599",
+  swap: "0x0DFA8a0e1CaC977015cc7D214380AeB24FE766d5",
+  liquidity: "0x853639EabeEa5a9DacC60D2e568674857F4e6A00",
 } as const;
 
 /**
@@ -89,12 +90,12 @@ export const FLOOR_BINDS_AT_TICKS = Math.floor(
  * Budgets are the documented ceilings, not aspirations.
  */
 export const GAS = {
-  ordinarySwap: 14_920,
+  ordinarySwap: 16_180,
   ordinaryBudget: 20_000,
-  blockBoundary: 34_337,
-  blockBoundaryWithLiveFeed: 50_837,
+  blockBoundary: 36_349,
+  blockBoundaryWithLiveFeed: 52_849,
   blockBoundaryBudget: 55_000,
-  extremeDislocation: 49_253,
+  extremeDislocation: 28_617,
   extremeBudget: 55_000,
   chainlinkRead: 20_774,
 } as const;

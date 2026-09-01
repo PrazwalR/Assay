@@ -20,17 +20,17 @@ const ETH_USD = 2_453.65;
 describe("gasCostUsd", () => {
   it("prices the ordinary-swap hook overhead on Base at a fraction of a cent", () => {
     const cost = gasCostUsd(GAS.ordinarySwap, BASE_GAS_PRICE, ETH_USD);
-    expect(cost).toBeCloseTo(0.00022, 5);
+    expect(cost).toBeCloseTo(0.000238, 5);
   });
 
   it("prices the same overhead on mainnet, still well under a cent", () => {
     const cost = gasCostUsd(GAS.ordinarySwap, MAINNET_GAS_PRICE, ETH_USD);
-    expect(cost).toBeCloseTo(0.00175, 5);
+    expect(cost).toBeCloseTo(0.0019, 4);
   });
 
   it("prices the most expensive path — a block boundary with a live feed read", () => {
     const cost = gasCostUsd(GAS.blockBoundaryWithLiveFeed, BASE_GAS_PRICE, ETH_USD);
-    expect(cost).toBeCloseTo(0.00075, 5);
+    expect(cost).toBeCloseTo(0.00078, 5);
     // The whole gas budget this project was designed around is worth less than a cent.
     expect(cost!).toBeLessThan(0.01);
   });

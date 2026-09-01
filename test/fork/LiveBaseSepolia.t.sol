@@ -17,6 +17,7 @@ import {ChainlinkReferenceAdapter, IAggregatorV3} from "../../src/oracle/Chainli
 import {PoolState} from "../../src/types/PoolState.sol";
 import {FeeBlend} from "../../src/libraries/FeeBlend.sol";
 import {Mispricing} from "../../src/libraries/Mispricing.sol";
+import {PoolTwap} from "../../src/libraries/PoolTwap.sol";
 import {IAssayEvents} from "../../src/interfaces/IAssayEvents.sol";
 
 interface IERC20Like {
@@ -41,9 +42,9 @@ interface IERC20Like {
 ///      endpoint). Skipped from `forge coverage` for the same reason gas tests are: a fork
 ///      test measures against live chain state, not the instrumented build.
 contract LiveBaseSepoliaForkTest is Test, IAssayEvents {
-    address internal constant HOOK = 0x4A20EB2C6B928d4c153E4cDe2D7011ead9fCb0c4;
-    address internal constant ORACLE_ADAPTER = 0xFA99bbD088EEc136b626aE98003240F12e851f98;
-    address internal constant SWAP_ROUTER = 0x689E091c7411dB859915E3D8e9b37aee1dC343Ef;
+    address internal constant HOOK = 0xc825ad661BA0398eF9Cf809E6635528C9aa370c4;
+    address internal constant ORACLE_ADAPTER = 0x56757460c56104aBD30a7783e7Ac0dcE380F0d38;
+    address internal constant SWAP_ROUTER = 0x0DFA8a0e1CaC977015cc7D214380AeB24FE766d5;
     address internal constant CHAINLINK_FEED = 0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1;
     address internal constant USDC = 0x036CbD53842c5426634e7929541eC2318f3dCF7e;
     address internal constant WETH = 0x4200000000000000000000000000000000000006;
@@ -53,6 +54,8 @@ contract LiveBaseSepoliaForkTest is Test, IAssayEvents {
     // immutable). Matches `.env` and is cross-checked indirectly: if this were wrong, the
     // fee-prediction assertion in `test_LiveSwap_MatchesLocalFeeBlendPrediction` would fail.
     uint24 internal constant CAPTURE_SHARE_BPS = 1000;
+    uint24 internal constant MAX_REFERENCE_DEVIATION_TICKS = 20_000;
+    uint64 internal constant TWAP_LAMBDA_X32 = 4_252_017_623;
 
     AssayHook internal hook;
     ChainlinkReferenceAdapter internal oracle;
@@ -95,28 +98,41 @@ contract LiveBaseSepoliaForkTest is Test, IAssayEvents {
     }
 
     /// @dev The strongest integration check available: predicts the fee a swap will be
-    ///      quoted using the same pure library the hook itself calls, computed from a
-    ///      snapshot of the hook's real, on-chain, pre-swap state -- then executes an actual
+    ///      quoted using the same pure library the hook itself calls, then executes an actual
     ///      swap through the real deployed router and asserts the `SwapAssayed` event matches
     ///      exactly. This is the one thing no mock-based test can give: proof the deployed
     ///      bytecode agrees with the local source.
     ///
-    ///      SKIPPED while the deployment is superseded. The address in `CONTRACTS.hook`
-    ///      predates the audit fixes in this tree -- most consequentially, the reference is
-    ///      refreshed in `beforeSwap` here and in `afterSwap` there, which changes the quote
-    ///      for exactly the swaps this asserts on. A green result would mean the local source
-    ///      had stopped moving, not that the deployment was correct. Re-enable on redeploy;
-    ///      the deliberate skip is itself the signal that a redeploy is owed.
+    ///      The reference now refreshes in `beforeSwap` (the fix for the reference-lag audit
+    ///      finding), so predicting from a `poolState()` snapshot taken before the swap is
+    ///      only correct if nothing refreshes in between -- which cannot be assumed on a live
+    ///      fork, where real time keeps passing between reads. `vm.roll` makes the refresh
+    ///      unconditional and deterministic instead of racing it: this swap is guaranteed to
+    ///      be the first of a new block, so the prediction reads the oracle directly, exactly
+    ///      as `_advanceReferenceInPlace` would, rather than a snapshot that might already be
+    ///      stale by the time the swap actually executes.
     function test_LiveSwap_MatchesLocalFeeBlendPrediction() public {
-        vm.skip(true);
+        vm.roll(block.number + 1);
 
         PoolState memory state = hook.poolState(poolId);
         (uint24 baseFeePips, uint24 minFeePips, uint24 maxFeePips) = hook.feeBounds();
 
+        (uint160 freshSqrtPriceX96, bool freshOk) = oracle.referenceSqrtPriceX96();
+        int24 freshReferenceTick = TickMath.getTickAtSqrtPrice(freshSqrtPriceX96);
+
+        // Replicates the deviation cap `_advanceReferenceInPlace` applies to that fresh
+        // reading before adopting it: fold the pool's own tick into the REAL existing anchor
+        // -- not a fresh one -- then check the fresh reading agrees with the result.
+        int64 anchorAfterFold = PoolTwap.update(state.twapTickX32, state.lastTick, TWAP_LAMBDA_X32);
+        bool withinCap =
+            PoolTwap.withinBound(anchorAfterFold, freshReferenceTick, MAX_REFERENCE_DEVIATION_TICKS);
+        bool referenceFresh = freshOk && withinCap;
+        int24 referenceTick = referenceFresh ? freshReferenceTick : state.referenceTick;
+
         bool zeroForOne = true; // sell USDC for WETH
         uint24 predictedFeePips = FeeBlend.quote(
-            Mispricing.signedTicks(state.referenceTick, state.lastTick, zeroForOne),
-            state.referenceFresh,
+            Mispricing.signedTicks(referenceTick, state.lastTick, zeroForOne),
+            referenceFresh,
             baseFeePips,
             minFeePips,
             maxFeePips,
@@ -162,7 +178,8 @@ contract LiveBaseSepoliaForkTest is Test, IAssayEvents {
             abi.encode(uint80(1), int256(1), block.timestamp, block.timestamp, uint80(1))
         );
 
-        vm.expectRevert();
-        oracle.referenceSqrtPriceX96();
+        (uint160 sqrtPriceX96, bool fresh) = oracle.referenceSqrtPriceX96();
+        assertEq(sqrtPriceX96, 0, "an unusable reading must report zero, not revert");
+        assertFalse(fresh, "and must report itself unusable");
     }
 }
