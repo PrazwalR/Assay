@@ -97,11 +97,19 @@ contract LiveBaseSepoliaForkTest is Test, IAssayEvents {
     /// @dev The strongest integration check available: predicts the fee a swap will be
     ///      quoted using the same pure library the hook itself calls, computed from a
     ///      snapshot of the hook's real, on-chain, pre-swap state -- then executes an actual
-    ///      swap through the real deployed router against the real deployed hook and asserts
-    ///      the `SwapAssayed` event matches the prediction exactly. This is the one thing no
-    ///      mock-based test can give: proof the deployed bytecode agrees with the local
-    ///      source it was supposedly compiled from.
+    ///      swap through the real deployed router and asserts the `SwapAssayed` event matches
+    ///      exactly. This is the one thing no mock-based test can give: proof the deployed
+    ///      bytecode agrees with the local source.
+    ///
+    ///      SKIPPED while the deployment is superseded. The address in `CONTRACTS.hook`
+    ///      predates the audit fixes in this tree -- most consequentially, the reference is
+    ///      refreshed in `beforeSwap` here and in `afterSwap` there, which changes the quote
+    ///      for exactly the swaps this asserts on. A green result would mean the local source
+    ///      had stopped moving, not that the deployment was correct. Re-enable on redeploy;
+    ///      the deliberate skip is itself the signal that a redeploy is owed.
     function test_LiveSwap_MatchesLocalFeeBlendPrediction() public {
+        vm.skip(true);
+
         PoolState memory state = hook.poolState(poolId);
         (uint24 baseFeePips, uint24 minFeePips, uint24 maxFeePips) = hook.feeBounds();
 
