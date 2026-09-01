@@ -128,6 +128,20 @@ the safe direction and is not a position anyone profits from.
 
 ## Known limitations
 
+- **The halt detector assumes `block.number` tracks this chain's own block production.**
+  It compares wall-clock time against `block.number` deltas to tell a halted chain from a
+  quiet pool (see [How it works](README.md#the-halt-detector)). That holds on Base and every
+  OP Stack chain, where `block.number` is the real L2 count. It does **not** hold on
+  Arbitrum or any Arbitrum Orbit chain (Robinhood Chain included) — there, `block.number`
+  returns the L1 block count, which advances far slower than L2 activity (~12s vs ~250ms).
+  Deployed there unmodified, `blocksElapsed` would be understated relative to real L2 time,
+  making the detector fire on ordinary activity, not just genuine halts — the safe direction
+  (forces the fee ceiling, never drops it), but a real usability regression. `script/DeployAssay.s.sol`
+  resolves the `PoolManager` address for whichever chain it's pointed at, including Arbitrum,
+  with no code change required to attempt the deploy — this repo has only ever deployed to
+  Base Sepolia, but nothing stops a fork from doing otherwise. Not fixed: the correct fix is
+  chain-conditional (`ArbSys.arbBlockNumber()` on Arbitrum), and this hook is not deployed
+  there.
 - **Splitting one trade into many reduces the drift charge.** The fee is quoted from the
   drift remaining at each swap, and every swap records the tick it left behind, so piece *i*
   of a split trade is priced against a drift piece *i-1* already closed. Measured at 20
