@@ -11,8 +11,9 @@ pragma solidity 0.8.26;
 ///        int64  twapTickX32     64    Q32.32 EWMA of the block-open tick; PoolTwap's anchor
 ///        uint32 lastRefreshAt   32    wall clock of the last boundary refresh
 ///        uint32 distrustedUntil 32    wall clock until which the reference is not trusted
+///        uint32 lastSampleBlock 32    block the TWAP last folded a sample in
 ///                              ---
-///                              216 used, 40 free
+///                              248 used, 8 free
 ///
 ///      Native packing is used rather than hand-rolled shifts so that sign extension of the
 ///      signed fields is the compiler's responsibility. `test_PoolState_OccupiesExactlyOneSlot`
@@ -29,4 +30,5 @@ struct PoolState {
     int64 twapTickX32;
     uint32 lastRefreshAt;
     uint32 referenceDistrustedUntil;
+    uint32 lastSampleBlock;
 }

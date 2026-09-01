@@ -35,7 +35,8 @@ contract PoolStateTest is Test {
                 referenceFresh: true,
                 twapTickX32: 4,
                 lastRefreshAt: 5,
-                referenceDistrustedUntil: 6
+                referenceDistrustedUntil: 6,
+                lastSampleBlock: 7
             })
         );
 

@@ -287,7 +287,8 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
             referenceFresh: referenceFresh,
             twapTickX32: PoolTwap.seed(seedTick),
             lastRefreshAt: uint32(block.timestamp),
-            referenceDistrustedUntil: 0
+            referenceDistrustedUntil: 0,
+            lastSampleBlock: uint32(block.number)
         });
 
         emit PoolRegistered(poolId, BASE_FEE_PIPS);
@@ -370,6 +371,21 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         // slither-disable-next-line unused-return
         (, int24 tickNow,,) = poolManager.getSlot0(poolId);
 
+        // The TWAP sample is gated on its own tracker, separate from the oracle refresh
+        // below, and fires unconditionally -- once, and only once, per block, regardless of
+        // whether the oracle ever answers. It must not be allowed to retry: `state.lastTick`
+        // still holds wherever the pool stood at the end of the previous block only on the
+        // FIRST pass through this function this block; every swap after the first has
+        // already overwritten it with this block's own tick at the bottom of this function.
+        // A gate that could re-enter this branch mid-block -- which an earlier version of
+        // the oracle-retry logic below did, by sharing one tracker with this fold -- would
+        // let a manipulated same-block tick walk the anchor the deviation cap depends on to
+        // be immune to exactly that.
+        if (state.lastSampleBlock != uint32(block.number)) {
+            state.lastSampleBlock = uint32(block.number);
+            state.twapTickX32 = PoolTwap.update(state.twapTickX32, state.lastTick, TWAP_LAMBDA_X32);
+        }
+
         // The reference is refreshed at most once per block rather than on every swap. A
         // live Chainlink read measures ~20,000 gas against the Base Sepolia aggregator, so
         // the cost is amortised across a block's swaps -- but the first swap of each block
@@ -394,13 +410,6 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
                 state.referenceDistrustedUntil = nowTruncated + uint32(POST_HALT_DISTRUST_SECONDS);
                 emit ChainHaltDetected(poolId, secondsElapsed, blocksElapsed, state.referenceDistrustedUntil);
             }
-
-            // `state.lastTick` still holds wherever the pool stood at the end of the
-            // previous block: this runs before it is overwritten below with the current
-            // swap's own tick, so nothing this block's swaps have done can be reflected in
-            // the sample folded in here. That is what keeps the average resistant to being
-            // moved from inside the same block that needs it to look a certain way.
-            state.twapTickX32 = PoolTwap.update(state.twapTickX32, state.lastTick, TWAP_LAMBDA_X32);
 
             (int24 referenceTick, bool referenceFresh, bool responded) = _readReference();
 

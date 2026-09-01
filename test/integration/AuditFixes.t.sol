@@ -15,6 +15,7 @@ import {AssayConfig} from "../../src/config/AssayConfig.sol";
 import {AssayHook} from "../../src/AssayHook.sol";
 import {PoolState} from "../../src/types/PoolState.sol";
 import {FeeBlend} from "../../src/libraries/FeeBlend.sol";
+import {PoolTwap} from "../../src/libraries/PoolTwap.sol";
 
 /// @notice Regression tests for the six issues filed against this hook.
 /// @dev Each test names the issue it pins. They are integration rather than unit tests
@@ -160,6 +161,123 @@ contract AuditFixesTest is AssayTestBase {
         _swap();
         uint32 blockAfterFirst = hook.poolState(poolKey.toId()).lastBlock;
         assertEq(blockAfterFirst, uint32(block.number), "an answered read retires the block");
+    }
+
+    // --- Regression: the halt-detector fix must not let a stuck oracle move the TWAP -----
+
+    /// @dev Pins the bug the bug-bounty pass found in this exact fix: `state.lastBlock` used
+    ///      to gate BOTH the TWAP fold and the oracle-refresh retry. Retrying the oracle
+    ///      within a block (added for issue #6) meant that while a call to it kept failing to
+    ///      even return, `state.lastBlock` never advanced -- so the TWAP-fold branch
+    ///      re-entered on every swap in the block, folding in `state.lastTick`, which by the
+    ///      second swap is that block's OWN post-swap tick, not the block-open tick the
+    ///      anchor is supposed to be immune to. `SECURITY.md` and
+    ///      `test_Exploit_SameBlockPriceManipulationCannotMoveTheTwapAnchor` both assert this
+    ///      is impossible; this proves it now holds even while the oracle call is stuck.
+    ///
+    ///      Uses `MockReferenceOracle` directly as `REFERENCE_ORACLE`, not the Chainlink
+    ///      adapter: a feed-level revert is absorbed by the adapter into a normal, answered
+    ///      "unusable" result (`responded = true`), which correctly retires the block --
+    ///      that path is `test_Issue6_AnUnusableButAnsweredReadStillRetiresTheBlock`.
+    ///      `responded = false` needs the call to the oracle itself to fail.
+    function test_Regression_TwapDoesNotFoldSameBlockTickWhileOracleIsStuck() public {
+        MockReferenceOracle stuck = new MockReferenceOracle(
+            TickMath.getSqrtPriceAtTick(0),
+            true,
+            Currency.wrap(address(token0)),
+            Currency.wrap(address(token1))
+        );
+        AssayConfig memory config = _defaultConfig();
+        config.referenceOracle = address(stuck);
+        AssayHook stuckHook = _deployHook(config);
+        poolKey = _initialisePool(address(stuckHook));
+        _addLiquidity();
+
+        // Establish a real historical tick before the attack block, so there is something
+        // for a wrongly-repeated fold to actually move the anchor toward.
+        vm.roll(block.number + 1);
+        _swap();
+        vm.roll(block.number + 1);
+        _swap();
+        int64 anchorBefore = stuckHook.poolState(poolKey.toId()).twapTickX32;
+
+        int24 tickAtAttackBlockOpen = stuckHook.poolState(poolKey.toId()).lastTick;
+        stuck.setShouldRevert(true);
+        vm.roll(block.number + 1);
+
+        // A manipulating swap, then many same-block swaps while the oracle call keeps
+        // failing to return -- exactly the shape that moved the anchor 98% of the way to the
+        // manipulated tick before this fix.
+        for (uint256 i = 0; i < 50; i++) {
+            _swap();
+        }
+
+        // Exactly one fold may have happened this block (the legitimate block-open sample).
+        // What must NOT have happened is 50 more of them chasing the manipulated tick.
+        int64 anchorAfterAttack = stuckHook.poolState(poolKey.toId()).twapTickX32;
+        int64 oneFold = PoolTwap.update(anchorBefore, tickAtAttackBlockOpen, TWAP_LAMBDA_X32);
+        assertEq(
+            anchorAfterAttack, oneFold, "50 same-block swaps must move the anchor exactly one fold, not 50"
+        );
+
+        // And a further same-block swap must move it no further at all.
+        _swap();
+        assertEq(
+            stuckHook.poolState(poolKey.toId()).twapTickX32,
+            anchorAfterAttack,
+            "the anchor must not keep folding within a block while the oracle call fails"
+        );
+    }
+
+    /// @dev The retry itself must still work: once the oracle call succeeds, the very next
+    ///      swap -- still the same block -- must be able to refresh the reference. The fix
+    ///      must not have traded the TWAP bug for silently disabling the retry.
+    function test_Regression_OracleRetryStillWorksAfterTheTwapFix() public {
+        MockReferenceOracle flaky = new MockReferenceOracle(
+            TickMath.getSqrtPriceAtTick(0),
+            true,
+            Currency.wrap(address(token0)),
+            Currency.wrap(address(token1))
+        );
+        AssayConfig memory config = _defaultConfig();
+        config.referenceOracle = address(flaky);
+        AssayHook flakyHook = _deployHook(config);
+        poolKey = _initialisePool(address(flakyHook));
+        _addLiquidity();
+
+        vm.roll(block.number + 1);
+        flaky.setShouldRevert(true);
+        _swap();
+        assertFalse(flakyHook.poolState(poolKey.toId()).referenceFresh, "first attempt must fail as set up");
+
+        flaky.setShouldRevert(false);
+        _swap();
+        assertTrue(
+            flakyHook.poolState(poolKey.toId()).referenceFresh,
+            "a later swap in the same block must still be able to retry and succeed"
+        );
+    }
+
+    /// @dev The TWAP must still fold exactly once per block on the healthy path -- the fix
+    ///      must not have turned "once per block" into "never". The fold blends in
+    ///      `state.lastTick` as it stood at the END of the previous block, so the probe needs
+    ///      a previous block whose closing tick actually differs from the anchor.
+    function test_Regression_TwapStillFoldsExactlyOnceOnTheHealthyPath() public {
+        vm.roll(block.number + 1);
+        _swap(); // moves the pool off tick 0, giving the next block's fold something to see
+
+        vm.roll(block.number + 1);
+        int64 anchorBefore = hook.poolState(poolKey.toId()).twapTickX32;
+        _swap();
+        int64 anchorAfterFirst = hook.poolState(poolKey.toId()).twapTickX32;
+        _swap();
+        int64 anchorAfterSecond = hook.poolState(poolKey.toId()).twapTickX32;
+
+        assertTrue(
+            anchorAfterFirst != anchorBefore,
+            "the first swap of a new block must fold in the previous block's closing tick"
+        );
+        assertEq(anchorAfterSecond, anchorAfterFirst, "a second swap in the same block must not fold again");
     }
 
     // --- Issue #4: undisclosed surcharge bound -----------------------------------------
