@@ -118,11 +118,13 @@ export default function OverviewPage() {
           </h2>
           <p className="mb-4 max-w-[70ch] text-[14px] leading-[1.65] text-[#9A8B72] text-pretty">
             The hook, its oracle and one USDC/WETH pool are live on Base Sepolia, and the
-            reference price above is read from the chain. But the pool has seen{" "}
-            <strong className="font-semibold">two swaps, both from the deploy script</strong> —
-            so the aggregate figures on the markets page (volume, TVL trend, the distribution of
-            quotes) are still illustrative fixtures rather than measurements. There is not yet
-            enough history to measure anything.
+            reference price above is read from the chain. The pool has now been traded{" "}
+            <strong className="font-semibold">nine times</strong> and holds about $57 of depth —
+            enough to show the hook pricing both directions of the same pool in the same
+            sequence (quotes ranged from the 100-pip floor to 4,700 pips), and not nearly enough
+            to be a distribution. The aggregates on the markets page — volume, TVL trend, the
+            spread of quotes — are still fixtures rather than measurements, and are labelled as
+            such wherever they appear.
           </p>
           {!DEMO_MODE && (
             <p className="max-w-[70ch] text-[14px] leading-[1.65] text-[#9A8B72] text-pretty">
