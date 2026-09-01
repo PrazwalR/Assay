@@ -363,6 +363,10 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
                 state.lastRefreshAt != 0
                     && secondsElapsed > blocksElapsed * MAX_SECONDS_PER_BLOCK + HALT_GRACE_SECONDS
             ) {
+                // A compile-time constant of 180, far inside uint32; the addition is meant
+                // to wrap with `nowTruncated` at the type's epoch, which is how every other
+                // timestamp comparison in this function stays correct across it.
+                // forge-lint: disable-next-line(unsafe-typecast)
                 state.referenceDistrustedUntil = nowTruncated + uint32(POST_HALT_DISTRUST_SECONDS);
                 emit ChainHaltDetected(poolId, secondsElapsed, blocksElapsed, state.referenceDistrustedUntil);
             }

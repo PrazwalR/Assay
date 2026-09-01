@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
-import {FullMath} from "v4-core/libraries/FullMath.sol";
 
 /// @notice Q32.32 fixed-point arithmetic: a real number `r` is stored as `r * 2**32`.
 /// @dev Q64.64 is the conventional choice but needs 128 bits, which does not fit the packed
