@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AssayMark } from "@/components/brand/AssayMark";
+import { DEMO_MODE } from "@/lib/demoMode";
 import { CONTRACTS, PERMISSION_MASK, explorerAddress, shortAddress } from "@/lib/protocol/config";
 
 export function Footer() {
@@ -63,12 +64,16 @@ export function Footer() {
             <li>
               <Link href="/docs/invariants">Invariants</Link>
             </li>
-            <li>
-              <Link href="/docs/risk">Risk &amp; known gaps</Link>
-            </li>
-            <li>
-              <Link href="/docs/not-built">What is not built</Link>
-            </li>
+            {!DEMO_MODE && (
+              <>
+                <li>
+                  <Link href="/docs/risk">Risk &amp; known gaps</Link>
+                </li>
+                <li>
+                  <Link href="/docs/not-built">What is not built</Link>
+                </li>
+              </>
+            )}
           </ul>
         </div>
       </div>

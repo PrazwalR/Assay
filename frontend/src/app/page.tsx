@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { QuoteCurve } from "@/components/quote/QuoteCurve";
 import { LiveReferenceStrip } from "@/components/quote/LiveReferenceStrip";
+import { DEMO_MODE } from "@/lib/demoMode";
 import {
   CAP_BINDS_AT_TICKS,
   DEPLOYED,
@@ -123,16 +124,18 @@ export default function OverviewPage() {
             quotes) are still illustrative fixtures rather than measurements. There is not yet
             enough history to measure anything.
           </p>
-          <p className="max-w-[70ch] text-[14px] leading-[1.65] text-[#9A8B72] text-pretty">
-            Separately, the adverse-selection gate does not currently pass: the mechanism is
-            implemented and the arithmetic is tested, but the evidence that it improves liquidity
-            provider outcomes is not established.{" "}
-            <Link href="/docs/risk" className="text-warm underline underline-offset-2">
-              The full result is in the docs
-            </Link>
-            , because a claim this project cannot support is not one it should make on a landing
-            page.
-          </p>
+          {!DEMO_MODE && (
+            <p className="max-w-[70ch] text-[14px] leading-[1.65] text-[#9A8B72] text-pretty">
+              Separately, the adverse-selection gate does not currently pass: the mechanism is
+              implemented and the arithmetic is tested, but the evidence that it improves
+              liquidity provider outcomes is not established.{" "}
+              <Link href="/docs/risk" className="text-warm underline underline-offset-2">
+                The full result is in the docs
+              </Link>
+              , because a claim this project cannot support is not one it should make on a
+              landing page.
+            </p>
+          )}
         </div>
       </section>
     </main>

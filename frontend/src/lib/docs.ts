@@ -5,7 +5,13 @@
  * navigation graph — what exists, in what order, under what heading. The sidebar, the prev/next
  * pager, the per-page table of contents and ⌘K search all derive from this one array, so a page
  * cannot appear in one and be missing from another.
+ *
+ * That single derivation is also what makes `DEMO_MODE` safe to express here: filtering the
+ * exported array withholds a page from the sidebar, the pager, search and `generateStaticParams`
+ * at once, so a hidden page cannot be reachable from one surface and missing from another.
  */
+
+import { DEMO_HIDDEN_DOCS, DEMO_MODE } from "@/lib/demoMode";
 
 export interface DocPage {
   slug: string;
@@ -15,7 +21,8 @@ export interface DocPage {
   toc: string[];
 }
 
-export const DOC_PAGES: DocPage[] = [
+/** Every page that exists in the repository, in navigation order. */
+export const ALL_DOC_PAGES: DocPage[] = [
   {
     slug: "introduction",
     label: "Introduction",
@@ -53,6 +60,15 @@ export const DOC_PAGES: DocPage[] = [
     toc: ["Measured and removed", "Contracts that do not exist"],
   },
 ];
+
+/**
+ * The pages this build presents. Identical to `ALL_DOC_PAGES` unless `DEMO_MODE` is on, in
+ * which case the Assurance pages it names are withheld — from the nav, the pager, search and
+ * the statically generated routes alike, since all four read this array.
+ */
+export const DOC_PAGES: DocPage[] = DEMO_MODE
+  ? ALL_DOC_PAGES.filter((page) => !DEMO_HIDDEN_DOCS.includes(page.slug))
+  : ALL_DOC_PAGES;
 
 export const findDoc = (slug: string) => DOC_PAGES.find((page) => page.slug === slug);
 

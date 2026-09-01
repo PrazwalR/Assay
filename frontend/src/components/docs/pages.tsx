@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { DEMO_MODE } from "@/lib/demoMode";
 import {
   CAP_BINDS_AT_TICKS,
   CONTRACTS,
@@ -284,8 +285,13 @@ function Invariants() {
       <P>
         The original design specified a rebate ledger with ERC-6909 accounting, EIP-712 router
         attestations, and an on-chain logistic classifier. None of it is built, so the
-        invariants covering ledger solvency and attestation replay do not apply. See{" "}
-        <Link href="/docs/not-built">what is not built</Link>.
+        invariants covering ledger solvency and attestation replay do not apply.
+        {!DEMO_MODE && (
+          <>
+            {" "}
+            See <Link href="/docs/not-built">what is not built</Link>.
+          </>
+        )}
       </P>
     </>
   );
