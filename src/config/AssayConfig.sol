@@ -8,10 +8,8 @@ import {Mispricing} from "../libraries/Mispricing.sol";
 import {Q32x32} from "../libraries/Q32x32.sol";
 
 /// @notice Construction-time parameters for a hook deployment.
-/// @dev Solidity cannot mark a struct `immutable`, so the hook stores these as individual
-///      immutables. This struct exists to keep the constructor signature and its validation
-///      in one auditable place. Fields are added by the milestone that first reads them;
-///      a field no code consumes is a stub in another shape.
+/// @dev Solidity cannot mark a struct `immutable`, so the hook stores these individually.
+///      This keeps the constructor signature and its validation in one auditable place.
 struct AssayConfig {
     uint24 baseFeePips;
     uint24 minFeePips;
@@ -32,7 +30,6 @@ library AssayConfigLib {
     /// @notice Reverts unless the fee bounds are internally consistent and within protocol limits.
     /// @dev One error per violated condition rather than a single generic failure, so a bad
     ///      deploy names the offending field instead of requiring a debugger.
-    /// @param config The parameters to validate.
     function validate(AssayConfig memory config) internal pure {
         if (config.minFeePips == 0 || config.baseFeePips == 0 || config.maxFeePips == 0) {
             revert IAssayErrors.AssayHook__FeeIsZero();

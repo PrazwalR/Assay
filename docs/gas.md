@@ -10,20 +10,21 @@ figures exclude one-off cold account and storage access, which otherwise swamps 
 
 | path | measured | budget | headroom |
 | --- | --- | --- | --- |
-| ordinary swap | 14,920 | 20,000 | 25% |
-| block boundary, mock feed | 34,337 | — | — |
-| **block boundary, live feed** | **50,837** | 55,000 | 8% |
-| extreme dislocation (surcharge) | 49,253 | 55,000 | 10% |
+| ordinary swap | 16,180 | 20,000 | 19% |
+| block boundary, mock feed | 36,349 | — | — |
+| **block boundary, live feed** | **52,849** | 55,000 | 4% |
+| extreme dislocation (surcharge) | 28,617 | 55,000 | 48% |
 
-Re-measured against `test/gas/HookOverhead.t.sol` directly (`forge test --match-path
-test/gas/HookOverhead.t.sol -vv`) rather than assumed from the table below: every path costs
-more than it did at the "after" snapshot in **What changed, and why**, because the
-reference-deviation-cap module was added afterward and its check sits on the same
-`afterSwap` path the variance removal shrank. Contract size moved with it: 9,625 bytes at
-that snapshot, 10,811 bytes now (`forge inspect src/AssayHook.sol:AssayHook
-deployedBytecode`, matches the deployed address). The live-feed path's headroom is the one
-worth watching — it dropped from a comfortable 14% to 8% of budget, not because anything
-regressed, but because two real features now share one gas budget that was sized for one.
+Re-measured after moving the reference refresh from `afterSwap` into `beforeSwap`. That
+move is why the ordinary path rose from 14,920: `beforeSwap` now writes the state slot
+rather than only reading it. It is the price of quoting a swap against a reference it can
+actually see -- see `test/exploit/ReferenceLag.t.sol`.
+
+The live-feed boundary headroom is now 4%, down from 8%. That is the number to watch: the
+budget is a real ceiling, and the next change to this path will need to buy its own room.
+The surcharge path fell to 28,617 because capping `MAX_OVERFLOW_PIPS` at 2% of notional
+removed most of the work it used to do on an extreme dislocation.
+
 
 **The live-feed figure is the one that matters.** Tests read a mock aggregator; a real
 Chainlink read measured **20,774 gas** against the deployed Base Sepolia adapter

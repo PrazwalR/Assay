@@ -6,19 +6,9 @@ import {Test} from "forge-std/Test.sol";
 import {Q32x32} from "../../src/libraries/Q32x32.sol";
 
 contract Q32x32Test is Test {
-    /// @dev Convexity is the property the whole EWMA bound rests on: if a blend can ever
-    ///      leave the interval spanned by its inputs, the variance estimate is unbounded and
-    ///      every downstream overflow argument collapses.
-    function testFuzz_Blend_StaysWithinItsInputs(uint64 previous, uint64 sample, uint64 lambda) public pure {
-        lambda = uint64(bound(lambda, 0, Q32x32.ONE));
-        uint64 result = Q32x32.blend(previous, sample, lambda);
-
-        uint64 low = previous < sample ? previous : sample;
-        uint64 high = previous < sample ? sample : previous;
-        assertGe(result, low, "blend fell below both inputs");
-        assertLe(result, high, "blend rose above both inputs");
-    }
-
+    /// @dev Convexity is the property the TWAP anchor's bound rests on: if a blend can ever
+    ///      leave the interval spanned by its inputs, the anchor is unbounded and the
+    ///      deviation cap that reads it stops meaning anything.
     function testFuzz_BlendSigned_StaysWithinItsInputs(int64 previous, int64 sample, uint64 lambda)
         public
         pure
@@ -32,34 +22,25 @@ contract Q32x32Test is Test {
         assertLe(result, high, "blend rose above both inputs");
     }
 
-    function test_Blend_AtLambdaZeroTakesTheSample() public pure {
-        assertEq(Q32x32.blend(1000, 7000, 0), 7000);
+    function test_BlendSigned_AtLambdaZeroTakesTheSample() public pure {
+        assertEq(Q32x32.blendSigned(1000, 7000, 0), 7000);
     }
 
-    function test_Blend_AtLambdaOneKeepsThePrevious() public pure {
-        assertEq(Q32x32.blend(1000, 7000, Q32x32.ONE), 1000);
+    function test_BlendSigned_AtLambdaOneKeepsThePrevious() public pure {
+        assertEq(Q32x32.blendSigned(1000, 7000, Q32x32.ONE), 1000);
     }
 
-    function test_Blend_HalfwayAveragesBothInputs() public pure {
-        assertEq(Q32x32.blend(1000, 3000, Q32x32.ONE / 2), 2000);
+    function test_BlendSigned_HalfwayAveragesBothInputs() public pure {
+        assertEq(Q32x32.blendSigned(1000, 3000, Q32x32.ONE / 2), 2000);
     }
 
-    /// @dev A saturating ratio is deliberate. This runs on the swap path, where reverting
-    ///      would brick the pool, and a ratio above one only means the order exceeded
-    ///      measured depth -- which the fee curve treats identically to exactly one.
-    function testFuzz_Ratio_NeverExceedsOne(uint128 numerator, uint128 denominator) public pure {
-        assertLe(Q32x32.ratio(numerator, denominator), Q32x32.ONE);
+    /// @dev The negative half of the domain, which the pool's tick anchor genuinely reaches
+    ///      and which an unsigned blend could never have exercised.
+    function test_BlendSigned_HalfwayAcrossZero() public pure {
+        assertEq(Q32x32.blendSigned(-2000, 2000, Q32x32.ONE / 2), 0);
     }
 
-    function test_Ratio_ZeroDenominatorYieldsZero() public pure {
-        assertEq(Q32x32.ratio(1000, 0), 0);
-    }
-
-    function test_Ratio_HalfIsHalfOfOne() public pure {
-        assertEq(Q32x32.ratio(1, 2), Q32x32.ONE / 2);
-    }
-
-    function test_Ratio_SaturatesWhenNumeratorExceedsDenominator() public pure {
-        assertEq(Q32x32.ratio(5, 1), Q32x32.ONE);
+    function test_BlendSigned_HalfwayBetweenTwoNegatives() public pure {
+        assertEq(Q32x32.blendSigned(-3000, -1000, Q32x32.ONE / 2), -2000);
     }
 }

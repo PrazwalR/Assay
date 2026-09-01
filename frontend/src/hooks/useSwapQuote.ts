@@ -10,7 +10,8 @@ import { usePoolCurve } from "@/hooks/usePoolCurve";
 import { useTokenBalances } from "@/hooks/useTokenBalances";
 import { SLIPPAGE_OPTIONS } from "@/components/modals/SettingsModal";
 import { CURRENCY0, TOKENS, isZeroForOne } from "@/lib/protocol/tokens";
-import { quote } from "@/lib/protocol/feeBlend";
+import { toneFor, toneLabel } from "@/lib/protocol/tone";
+import { ceilingOverflowPips, quote } from "@/lib/protocol/feeBlend";
 import { quoteExactInput } from "@/lib/protocol/swapMath";
 import { sqrtPriceLimitX96 } from "@/lib/protocol/slippage";
 
@@ -53,6 +54,14 @@ export function useSwapQuote() {
     const drift = driftIsLive ? (zeroForOne ? chainDrift : -chainDrift) : simulatedDrift;
     const referenceFresh = driftIsLive ? pool.referenceFresh : true;
     const feePips = quote(drift, referenceFresh, bounds);
+
+    // Everything the swap page says about this quote is derived here, from this one drift.
+    // Panels used to source these from the landing page's animated walk while showing the
+    // live fee beside them, so the explanation and the number disagreed on screen.
+    const twinFeePips = quote(-drift, referenceFresh, bounds);
+    const overflowPips = ceilingOverflowPips(drift, referenceFresh, bounds);
+    const tone = toneFor(drift, referenceFresh);
+    const toneText = toneLabel(drift, referenceFresh);
 
     // USD is anchored to the pool's own tick, not to the drift. currency1 (WETH) per currency0
     // (USDC) means ETH gets cheaper as the tick rises, hence the negative exponent.
@@ -107,6 +116,10 @@ export function useSwapQuote() {
       driftIsLive,
       referenceFresh,
       feePips,
+      twinFeePips,
+      overflowPips,
+      tone,
+      toneText,
 
       amount,
       amountInUnits,

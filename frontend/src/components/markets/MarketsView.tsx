@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { useAssay } from "@/components/Providers";
+import { useLivePool } from "@/hooks/useLivePool";
 import { ScatterChart } from "@/components/markets/ScatterChart";
 import { DEPLOYED, PERMISSION_MASK } from "@/lib/protocol/config";
 import { int, usdCompact } from "@/lib/format";
@@ -25,6 +26,7 @@ import { CURRENCY0, CURRENCY1 } from "@/lib/protocol/tokens";
  */
 export function MarketsView() {
   const { dataMode } = useAssay();
+  const pool = useLivePool();
   const [range, setRange] = useState<RangeLabel>("1D");
 
   const factor = RANGES.find((entry) => entry.label === range)?.factor ?? 1;
@@ -202,7 +204,17 @@ export function MarketsView() {
           <span className="tnum text-right text-[13.5px] leading-none text-accent">
             {baseline.meanFeeBp.toFixed(2)} bp
           </span>
-          <span className="text-right font-mono text-xs leading-none text-benign">fresh</span>
+          <span
+            className={`text-right font-mono text-xs leading-none ${
+              pool.referenceTick === undefined
+                ? "text-text-muted"
+                : pool.referenceFresh
+                  ? "text-benign"
+                  : "text-warm"
+            }`}
+          >
+            {pool.referenceTick === undefined ? "—" : pool.referenceFresh ? "fresh" : "stale"}
+          </span>
         </div>
 
         <div className="flex items-center gap-[11px] border-t border-border bg-bg px-5 py-[15px]">

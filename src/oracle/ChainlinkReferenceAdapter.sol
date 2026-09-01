@@ -31,20 +31,15 @@ contract ChainlinkReferenceAdapter is IReferencePriceOracle {
     ///      off chain at deployment, so no exponentiation happens at read time.
     uint256 public immutable PRICE_NUMERATOR;
 
-    /// @dev Largest feed answer that `_toSqrtPriceX96` cannot divide by. `FullMath.mulDiv`
-    ///      requires its denominator to exceed the high 256 bits of the product, which for
-    ///      `PRICE_NUMERATOR << 192` is `PRICE_NUMERATOR >> 64`. An answer at or below this
-    ///      makes that call revert -- so it is screened here and reported unusable, keeping
-    ///      the never-reverts contract true in this contract rather than only because the
-    ///      caller happens to wrap it. Chainlink's own `minAnswer` sentinel of 1 sits inside
-    ///      this range for the decimal scaling this adapter is deployed with.
+    /// @dev Largest answer `_toSqrtPriceX96` cannot divide by: `FullMath.mulDiv` requires the
+    ///      denominator to exceed the product's high 256 bits, which for `PRICE_NUMERATOR <<
+    ///      192` is `PRICE_NUMERATOR >> 64`. Screened here so the never-reverts contract holds
+    ///      in this contract, not merely because the caller wraps it. Chainlink's own
+    ///      `minAnswer` sentinel of 1 sits inside this range at the deployed scaling.
     uint256 public immutable MIN_DIVISIBLE_ANSWER;
 
-    /// @dev Gas ceiling on the feed call. A feed that burns gas rather than reverting would
-    ///      otherwise consume 63/64 of whatever the swapper supplied and leave too little to
-    ///      finish the swap, turning a graceful degradation into a failed transaction. The
-    ///      honest call measures ~21,000 gas against the live aggregator, so this is roughly
-    ///      five times what a working feed needs.
+    /// @dev A feed that burns gas rather than reverting would otherwise take 63/64 of the
+    ///      swapper's gas and leave too little to finish the swap. Honest call is ~21,000.
     uint256 internal constant FEED_GAS_LIMIT = 100_000;
 
     IAggregatorV3 public immutable FEED;
@@ -74,14 +69,6 @@ contract ChainlinkReferenceAdapter is IReferencePriceOracle {
     ///      argument is what closes the mistake: a numerator computed for the wrong feed or
     ///      token decimals used to deploy silently and price every swap against a reference
     ///      that was not the price of anything.
-    /// @param feed The Chainlink aggregator to read.
-    /// @param maxAgeSeconds How old a reading may be before it stops counting as fresh.
-    /// @param priceNumerator Decimal scaling for this pool's token pair and this feed:
-    ///        `10 ** (currency1Decimals - currency0Decimals + feed.decimals())`.
-    /// @param currency0 Lower-sorted currency of the pair this scaling describes.
-    /// @param currency0Decimals The ERC-20 decimals of `currency0` (18 for native ETH).
-    /// @param currency1 Higher-sorted currency of that pair.
-    /// @param currency1Decimals The ERC-20 decimals of `currency1` (18 for native ETH).
     constructor(
         IAggregatorV3 feed,
         uint256 maxAgeSeconds,
@@ -97,12 +84,9 @@ contract ChainlinkReferenceAdapter is IReferencePriceOracle {
         if (maxAgeSeconds == 0) revert ChainlinkReferenceAdapter__MaxAgeIsZero();
         if (priceNumerator == 0) revert ChainlinkReferenceAdapter__PriceNumeratorIsZero();
 
-        // Real ERC-20 decimals and feed decimals both sit in a small range (0-18 for every
-        // token and feed this adapter is deployed against), so `currency1Decimals +
-        // feed.decimals()` is never smaller than `currency0Decimals` in practice. If a future
-        // deployment somehow violates that, the subtraction underflows and this constructor
-        // reverts -- failing exactly as safely as the explicit checks around it, just with a
-        // panic instead of a custom error.
+        // Decimals sit in 0-18 for every token and feed this is deployed against, so the
+        // subtraction cannot underflow in practice; if it ever did, the constructor reverts,
+        // which fails as safely as the explicit checks around it.
         uint256 expectedNumerator =
             10 ** (uint256(currency1Decimals) + uint256(feed.decimals()) - uint256(currency0Decimals));
         if (priceNumerator != expectedNumerator) {
@@ -133,18 +117,11 @@ contract ChainlinkReferenceAdapter is IReferencePriceOracle {
     }
 
     /// @inheritdoc IReferencePriceOracle
-    /// @dev `roundId` and `answeredInRound` are deliberately discarded. The
-    ///      `answeredInRound >= roundId` idiom applied to legacy aggregators and is no
-    ///      longer meaningful for OCR feeds, so checking it would provide false assurance
-    ///      rather than protection. `startedAt` and `updatedAt` are both checked for zero: an
-    ///      OCR feed writes them together, so this is one condition observed through two
-    ///      fields, and checking both costs one comparison against a round that never
-    ///      completed being reported as usable.
-    ///
-    ///      Staleness is a wall-clock question, so `block.timestamp` is the only available
-    ///      answer. A proposer can nudge it by a few seconds, which is immaterial against a
-    ///      staleness bound measured in minutes or hours, and the worst outcome either way
-    ///      is a reading marked unusable rather than a wrong price being trusted.
+    /// @dev `roundId`/`answeredInRound` are discarded: the `answeredInRound >= roundId` idiom
+    ///      applied to legacy aggregators and would give false assurance on OCR feeds.
+    ///      Staleness is a wall-clock question, so `block.timestamp` is the only answer
+    ///      available; a proposer can nudge it by seconds, immaterial against a bound in
+    ///      minutes, and the worst outcome is a reading marked unusable.
     // slither-disable-next-line timestamp,unused-return
     function referenceSqrtPriceX96() external view returns (uint160 sqrtPriceX96, bool fresh) {
         // A feed that reverts, returns a non-positive answer, or has stopped updating is a

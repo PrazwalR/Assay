@@ -121,11 +121,11 @@ export function SimulationView() {
             <Timeline stages={stages} />
             <div className="grid gap-5">
               <TransactionList txs={txs} />
-              <PoolConvergence scenario={scenario} live={status === "complete"} />
+              <PoolConvergence scenario={scenario} />
             </div>
           </div>
 
-          <FeeComparison scenario={scenario} live={status === "complete"} />
+          <FeeComparison scenario={scenario} />
         </>
       )}
     </main>
@@ -334,7 +334,7 @@ function TransactionList({ txs }: { txs: ReturnType<typeof useSimulation>["txs"]
   );
 }
 
-function PoolConvergence({ scenario, live }: { scenario: Scenario; live: boolean }) {
+function PoolConvergence({ scenario }: { scenario: Scenario }) {
   const rows = [
     { label: "Before the move", snap: scenario.initial },
     { label: "Mispriced", snap: scenario.dislocated },
@@ -346,7 +346,7 @@ function PoolConvergence({ scenario, live }: { scenario: Scenario; live: boolean
         <p className="font-mono text-[10.5px] font-medium uppercase leading-none tracking-[0.12em] text-text-muted">
           Price convergence
         </p>
-        <Origin origin={live ? "live-testnet" : "projected"} />
+        <Origin origin="projected" />
       </header>
       <table className="w-full border-collapse border-t border-border text-left">
         <thead>
@@ -388,7 +388,7 @@ function PoolConvergence({ scenario, live }: { scenario: Scenario; live: boolean
   );
 }
 
-function FeeComparison({ scenario, live }: { scenario: Scenario; live: boolean }) {
+function FeeComparison({ scenario }: { scenario: Scenario }) {
   const { economics, arbitrageLeg } = scenario;
   const ratio = economics.flatFeeToLpUsd > 0 ? economics.feeToLpUsd / economics.flatFeeToLpUsd : 0;
 
@@ -403,7 +403,7 @@ function FeeComparison({ scenario, live }: { scenario: Scenario; live: boolean }
             The same trade, priced by Assay and by a flat-fee pool
           </p>
         </div>
-        <Origin origin={live ? "live-testnet" : "projected"} />
+        <Origin origin="projected" />
       </header>
 
       <table className="w-full border-collapse border-t border-border text-left">

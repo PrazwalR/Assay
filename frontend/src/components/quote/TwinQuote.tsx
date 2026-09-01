@@ -1,9 +1,6 @@
 "use client";
 
-import { useAssay } from "@/components/Providers";
 import { useSwapQuote } from "@/hooks/useSwapQuote";
-import { useLiveProtocol } from "@/hooks/useLiveProtocol";
-import { quote } from "@/lib/protocol/feeBlend";
 import { pipsToBp } from "@/lib/format";
 
 /**
@@ -15,11 +12,9 @@ import { pipsToBp } from "@/lib/format";
  * `test/integration/DynamicPricing.t.sol`.
  */
 export function TwinQuote() {
-  const { tone } = useAssay();
-  // "Right now" has to mean the live pool, not a random walk running beside it.
-  const { drift, feePips, referenceFresh } = useSwapQuote();
-  const { bounds } = useLiveProtocol();
-  const twinFeePips = quote(-drift, referenceFresh, bounds);
+  // "Right now" has to mean the live pool, not a random walk running beside it -- and when
+  // it is not live, the panel has to say so rather than assert a reading it does not have.
+  const { drift, feePips, twinFeePips, tone, driftIsLive } = useSwapQuote();
   const spread = (feePips - twinFeePips) / 100;
 
   return (
@@ -71,6 +66,10 @@ export function TwinQuote() {
         swaps a volatility-driven hook would quote identically. Measured in{" "}
         <span className="font-mono">test/integration/DynamicPricing.t.sol</span> at 100 bp
         against 1 bp.
+      </p>
+
+      <p className="mt-2 font-mono text-[10.5px] leading-none text-text-muted">
+        {driftIsLive ? "live drift, read from the hook" : "drift simulated — pool not read yet"}
       </p>
     </section>
   );

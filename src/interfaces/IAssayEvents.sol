@@ -7,59 +7,32 @@ import {PoolId} from "v4-core/types/PoolId.sol";
 ///         dashboard needs to filter on.
 interface IAssayEvents {
     /// @notice Emitted once per pool when the hook attaches and seeds the base fee.
-    /// @param poolId The pool the hook was attached to.
-    /// @param baseFeePips The fee seeded via `updateDynamicLPFee`, in hundredths of a bip.
     event PoolRegistered(PoolId indexed poolId, uint24 baseFeePips);
 
     /// @notice Emitted for every scored swap, giving per-swap attribution of the quoted fee.
-    /// @param poolId The pool the swap executed against.
-    /// @param sender The address that called the PoolManager, which is the router and not
-    ///        the trader. It must never be treated as an identity.
-    /// @param feePips The fee quoted for this swap, in hundredths of a bip.
     event SwapAssayed(PoolId indexed poolId, address indexed sender, uint24 feePips);
 
-    /// @notice Emitted when the reference price source starts or stops producing usable
-    ///         readings for a pool.
-    /// @dev Emitted only on transition, not per swap. A pool that goes stale is quoting
-    ///      without a view of its own drift, which is the condition an operator most needs
-    ///      to know about.
-    /// @param poolId The pool whose reference changed state.
-    /// @param fresh Whether the reference is now usable.
+    /// @notice Emitted when the reference source starts or stops producing usable readings.
+    /// @dev On transition only, not per swap.
     event ReferenceFreshnessChanged(PoolId indexed poolId, bool fresh);
 
-    /// @notice Emitted when a swap's drift exceeded what the percentage-of-notional fee
-    ///         could express, and the remainder was taken and donated to in-range liquidity.
-    /// @dev Rare by construction: it requires a dislocation large enough that the uncapped
-    ///      fee formula exceeds `maxFeePips`, which does not happen on ordinary swaps.
-    /// @param poolId The pool the donation was made to.
-    /// @param amount The amount donated, in the swap's unspecified currency.
-    /// @param inCurrency0 Whether that currency was `key.currency0`.
+    /// @notice Emitted when a swap's drift exceeded what a percentage fee could express and
+    ///         the remainder was donated to in-range liquidity.
+    /// @dev Rare by construction: needs a dislocation past `maxFeePips`.
     event ToxicitySurchargeDonated(PoolId indexed poolId, uint256 amount, bool inCurrency0);
 
-    /// @notice Emitted when wall-clock time advanced far more than the block count can
-    ///         explain, which on a single-sequencer chain means production stopped.
-    /// @dev Worth its own event rather than folding into `ReferenceFreshnessChanged`: the
-    ///      pool is not reacting to anything it observed about the feed, it is reacting to
-    ///      the chain itself having been absent, and that is the condition an operator wants
-    ///      to correlate against a sequencer status page.
-    /// @param poolId The pool that observed the gap.
-    /// @param secondsElapsed Wall-clock seconds since the last boundary refresh.
-    /// @param blocksElapsed Blocks produced across that same span.
-    /// @param distrustedUntil Wall clock until which the reference is treated as unusable.
+    /// @notice Emitted when wall-clock time advanced far more than the block count explains,
+    ///         which on a single-sequencer chain means production stopped.
+    /// @dev Separate from `ReferenceFreshnessChanged`: this reacts to the chain having been
+    ///      absent, not to anything observed about the feed.
     event ChainHaltDetected(
         PoolId indexed poolId, uint256 secondsElapsed, uint256 blocksElapsed, uint32 distrustedUntil
     );
 
-    /// @notice Emitted when the reference source reported a usable reading, but it was
-    ///         rejected for disagreeing with the pool's own smoothed tick by more than the
-    ///         configured cap. The pool is treated as if the reference were stale.
-    /// @dev Distinct from `ReferenceFreshnessChanged` so an operator can tell "the feed went
-    ///      dark" apart from "the feed answered, but this hook does not believe it" -- the
-    ///      second is the more actionable one to page someone about.
-    /// @param poolId The pool whose reference was rejected.
-    /// @param referenceTick The rejected reading.
-    /// @param twapTick The pool's own smoothed tick it was checked against.
-    /// @param maxDeviationTicks The configured cap that was exceeded.
+    /// @notice Emitted when a usable reading was rejected for disagreeing with the pool's own
+    ///         smoothed tick by more than the cap.
+    /// @dev Distinct from `ReferenceFreshnessChanged` so "the feed went dark" can be told
+    ///      apart from "the feed answered and this hook does not believe it".
     event ReferenceDeviationCapTripped(
         PoolId indexed poolId, int24 referenceTick, int24 twapTick, uint24 maxDeviationTicks
     );

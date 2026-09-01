@@ -12,7 +12,6 @@ interface IReferencePriceOracle {
     /// @dev Returned as a square-root price so it is directly comparable with a pool's
     ///      `sqrtPriceX96` without any conversion at the call site.
     /// @return sqrtPriceX96 The reference price, or zero when no usable reading exists.
-    /// @return fresh Whether the reading is recent enough and well formed enough to act on.
     function referenceSqrtPriceX96() external view returns (uint160 sqrtPriceX96, bool fresh);
 
     /// @notice The pool currencies this source prices.
@@ -21,7 +20,5 @@ interface IReferencePriceOracle {
     ///      state which, and a consumer must refuse pools that do not match. Without this a
     ///      hook prices whatever pool attaches to it against a reference for different
     ///      assets, and reports the reading as fresh while doing so.
-    /// @return currency0 The lower-sorted currency, matching v4 pool key ordering.
-    /// @return currency1 The higher-sorted currency.
     function pricedCurrencies() external view returns (Currency currency0, Currency currency1);
 }

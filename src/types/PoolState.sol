@@ -15,13 +15,10 @@ pragma solidity 0.8.26;
 ///                              ---
 ///                              248 used, 8 free
 ///
-///      Native packing is used rather than hand-rolled shifts so that sign extension of the
-///      signed fields is the compiler's responsibility. `test_PoolState_OccupiesExactlyOneSlot`
-///      asserts the layout, so a field added past the 256-bit budget fails loudly.
-///
-///      The reference price is cached rather than read on demand. Reading a Chainlink feed
-///      costs roughly 20,000 gas measured against the live Base Sepolia aggregator, so it is
-///      refreshed at most once per block and the quote path is served from this slot.
+///      Native packing rather than hand-rolled shifts, so sign extension is the compiler's
+///      responsibility. `test_PoolState_OccupiesExactlyOneSlot` asserts the layout, so a
+///      field pushed past the 256-bit budget fails loudly rather than costing a second
+///      SLOAD/SSTORE on every swap.
 struct PoolState {
     int24 lastTick;
     int24 referenceTick;

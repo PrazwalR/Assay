@@ -3,8 +3,9 @@
 import { useCallback, useRef } from "react";
 
 import { useAssay } from "@/components/Providers";
+import { useLiveProtocol } from "@/hooks/useLiveProtocol";
 import { useSwapQuote } from "@/hooks/useSwapQuote";
-import { CAP_BINDS_AT_TICKS, DEPLOYED } from "@/lib/protocol/config";
+import { CAP_BINDS_AT_TICKS } from "@/lib/protocol/config";
 import { ceilingOverflowPips, rawQuotedPips } from "@/lib/protocol/feeBlend";
 import { num, signed } from "@/lib/format";
 
@@ -24,12 +25,15 @@ export function FeeDerivation() {
   const { setDrift, tone } = useAssay();
   // The live drift, not the demonstration walk. This panel sits beside the swap card and used
   // to contradict it — showing 100-3,700 pips next to the card's 790.
-  const { drift, feePips, feePaidOut, outToken, driftIsLive } = useSwapQuote();
-  const overflowPips = ceilingOverflowPips(drift, true, DEPLOYED);
+  const { drift, feePips, feePaidOut, outToken, driftIsLive, referenceFresh } = useSwapQuote();
+  // The rows must add up to the result. Using DEPLOYED here while the result row used
+  // the live bounds meant they would silently disagree the moment the two diverged.
+  const { bounds } = useLiveProtocol();
+  const overflowPips = ceilingOverflowPips(drift, referenceFresh, bounds);
   const meter = useRef<HTMLDivElement>(null);
 
-  const raw = rawQuotedPips(drift, DEPLOYED);
-  const surcharge = raw - DEPLOYED.baseFeePips;
+  const raw = rawQuotedPips(drift, bounds);
+  const surcharge = raw - bounds.baseFeePips;
 
   const driftFromPointer = useCallback(
     (clientX: number) => {
@@ -141,15 +145,15 @@ export function FeeDerivation() {
       </div>
 
       <dl className="grid gap-px border-t border-border bg-border">
-        <DerivationRow label="baseFeePips" value={DEPLOYED.baseFeePips.toLocaleString("en-US")} />
+        <DerivationRow label="baseFeePips" value={bounds.baseFeePips.toLocaleString("en-US")} />
         <DerivationRow
-          label={`⌈ drift × 100 pips/tick × ${(DEPLOYED.captureShareBps / 100).toFixed(2)}% ⌉`}
+          label={`⌈ drift × 100 pips/tick × ${(bounds.captureShareBps / 100).toFixed(2)}% ⌉`}
           value={signed(surcharge)}
           tone
         />
         <DerivationRow label="Uncapped quote" value={`${raw.toLocaleString("en-US")} pips`} />
         <DerivationRow
-          label={`clamp( ${DEPLOYED.minFeePips} , ${DEPLOYED.maxFeePips.toLocaleString("en-US")} )`}
+          label={`clamp( ${bounds.minFeePips} , ${bounds.maxFeePips.toLocaleString("en-US")} )`}
           value={`${feePips.toLocaleString("en-US")} pips`}
           tone
           emphasis

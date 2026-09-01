@@ -86,7 +86,7 @@ export type RunStatus = "idle" | "running" | "complete" | "failed";
 export function useSimulation(input: ScenarioInput) {
   const { curve, tick: poolTick } = usePoolCurve();
   const pool = useLivePool();
-  const { gasPriceWei } = useLiveProtocol();
+  const { gasPriceWei, bounds } = useLiveProtocol();
   const { address, chainId, isConnected } = useAccount();
   const { writeContractAsync } = useWriteContract();
   const config = useConfig();
@@ -103,8 +103,9 @@ export function useSimulation(input: ScenarioInput) {
    * before pressing the button reflects the pool as it is now, not as it was on page load.
    */
   const scenario: Scenario | undefined = useMemo(
-    () => buildScenario(curve, pool.referenceTick, gasPriceWei, input),
-    [curve, pool.referenceTick, gasPriceWei, input],
+    () =>
+      buildScenario(curve, pool.referenceTick, gasPriceWei, input, bounds, pool.referenceFresh),
+    [curve, pool.referenceTick, gasPriceWei, input, bounds, pool.referenceFresh],
   );
 
   const stages: Stage[] = useMemo(

@@ -27,21 +27,10 @@ import {PoolState} from "./types/PoolState.sol";
 
 /// @title AssayHook
 /// @notice A Uniswap v4 hook that prices adverse selection per swap rather than per pool.
-/// @dev Every formula lives in a pure library; this contract reads state, delegates, writes
-///      state and returns values. That separation is what makes the math independently
-///      fuzzable without a PoolManager. The only arithmetic here is the `|` that sets v4's
-///      fee-override flag and the `uint32(block.number)` narrowing used to detect a block
-///      boundary; the only other control flow is the boolean combination in
-///      `_advanceStateInPlace` that lets the deviation cap veto a reading `_readReference`
-///      itself reported fresh. None of these is a formula, and all are covered by the tests
-///      below.
-///
-///      The quoted fee is set from the drift a swap captures against a cached reference
-///      price. Realised variance and order-flow imbalance were previously maintained here
-///      and have been removed: calibration measured their incremental value over the
-///      reference signal at -0.008 and -0.002 across two windows, so they were paying gas on
-///      every swap to make the classifier no better. The libraries remain in the tree, pure
-///      and tested, for the milestone that can show they earn their cost.
+/// @dev The fee is set from the drift a swap captures against a cached reference price.
+///      Every formula lives in a pure library; this contract reads state, delegates, writes
+///      state and returns values, which is what makes the math fuzzable without a
+///      PoolManager.
 contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     using LPFeeLibrary for uint24;
     using StateLibrary for IPoolManager;
@@ -54,26 +43,22 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     uint24 private immutable MAX_REFERENCE_DEVIATION_TICKS;
     uint64 private immutable TWAP_LAMBDA_X32;
 
-    /// @dev Gas ceiling on the reference read. Without one, an oracle that burns gas rather
-    ///      than reverting consumes 63/64 of whatever the swapper supplied, leaving too
-    ///      little to finish `afterSwap` -- turning a degradation into a failed swap for
-    ///      every first-of-block trade. The honest read measures ~21,000 gas.
+    /// @dev Without a ceiling, an oracle that burns gas rather than reverting takes 63/64 of
+    ///      whatever the swapper supplied and starves the rest of the swap. Honest read is
+    ///      ~21,000 gas.
     uint256 private constant ORACLE_READ_GAS_LIMIT = 150_000;
 
-    /// @dev Wall-clock seconds per block above which the chain is treated as having halted
-    ///      rather than merely being quiet. Deliberately far above any real chain's cadence
-    ///      (Base produces a block every ~2s) so this cannot misfire on ordinary jitter, and
-    ///      so the same constant holds if this hook is deployed to a slower chain.
+    /// @dev Seconds per block above which the chain is treated as halted rather than quiet.
+    ///      Far above any real cadence (Base is ~2s) so it cannot misfire on jitter.
     uint256 private constant MAX_SECONDS_PER_BLOCK = 30;
 
     /// @dev Absolute slack on the halt test, so a single late block is never a halt.
     uint256 private constant HALT_GRACE_SECONDS = 90;
 
-    /// @dev How long the reference stays distrusted after a halt is observed. A halted chain
-    ///      freezes the pool's tick and the feed's `updatedAt` together, so on resumption the
-    ///      two still agree with each other while both disagree with the world -- the drift
-    ///      reads as zero at exactly the moment it is largest. This window holds the quote at
-    ///      the ceiling until the feed has had time to post a reading from after the halt.
+    /// @dev A halt freezes the pool tick and the feed's `updatedAt` together, so on
+    ///      resumption they still agree with each other while both disagree with the world.
+    ///      This window holds the quote at the ceiling until the feed can post a reading
+    ///      from after the halt.
     uint256 private constant POST_HALT_DISTRUST_SECONDS = 180;
 
     mapping(PoolId poolId => PoolState) private _poolState;
@@ -82,8 +67,6 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     /// @dev The address this deploys to must carry exactly the permission bits returned by
     ///      `getHookPermissions`; `BaseHook` enforces that in its constructor, so deployment
     ///      requires a mined CREATE2 salt.
-    /// @param poolManager The v4 PoolManager singleton this hook serves.
-    /// @param config Fee bounds and estimator parameters, validated before any immutable is set.
     constructor(IPoolManager poolManager, AssayConfig memory config) BaseHook(poolManager) {
         AssayConfigLib.validate(config);
         BASE_FEE_PIPS = config.baseFeePips;
@@ -101,7 +84,6 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     ///      path where the hook touches swapper funds and is the first thing to review.
     ///      Permission bits are encoded in the hook address, so a bit cannot be added later
     ///      without changing the address and invalidating every recorded deployment.
-    /// @return permissions The v4 permission set, corresponding to address mask 0x30C4.
     function getHookPermissions() public pure override returns (Hooks.Permissions memory permissions) {
         return Hooks.Permissions({
             beforeInitialize: true,
@@ -122,46 +104,29 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     }
 
     /// @notice The fee bounds this hook was deployed with, in hundredths of a bip.
-    /// @dev Exposed because a router or LP needs to know the worst fee a swap can be quoted
-    ///      before routing into the pool.
-    /// @return baseFeePips The fee quoted when no adverse-selection signal applies.
-    /// @return minFeePips The floor of any quoted fee.
-    /// @return maxFeePips The ceiling of any quoted fee.
+    /// @dev See `surchargeBounds` for the separate ceiling on the donate surcharge; this
+    ///      covers only the percentage fee.
     function feeBounds() external view returns (uint24 baseFeePips, uint24 minFeePips, uint24 maxFeePips) {
         return (BASE_FEE_PIPS, MIN_FEE_PIPS, MAX_FEE_PIPS);
     }
 
     /// @notice The most this hook can take from a swap beyond the quoted LP fee.
-    /// @dev `feeBounds` describes only the percentage fee the PoolManager collects. On an
-    ///      extreme dislocation the hook additionally takes the part of the uncapped formula
-    ///      that a percentage fee could not express and donates it to in-range liquidity, and
-    ///      that amount is bounded separately. An integrator sizing slippage from `feeBounds`
-    ///      alone would not be sizing against the worst case, so the second bound is exposed
-    ///      beside the first rather than left to be discovered.
-    /// @return maxSurchargePips Ceiling on the surcharge, in hundredths of a bip of the
-    ///         swap's unspecified-currency notional.
-    /// @return maxTotalPips Ceiling on fee and surcharge combined -- the true worst case.
+    /// @dev An integrator sizing slippage from `feeBounds` alone is not sizing against the
+    ///      worst case, because the donate surcharge is bounded separately from it.
+    /// @return maxSurchargePips Ceiling on the surcharge, as a share of notional.
     function surchargeBounds() external view returns (uint24 maxSurchargePips, uint24 maxTotalPips) {
         return (FeeBlend.MAX_OVERFLOW_PIPS, MAX_FEE_PIPS + FeeBlend.MAX_OVERFLOW_PIPS);
     }
 
     /// @notice Current microstructure state for a pool.
-    /// @param poolId The pool to read.
-    /// @return state Last observed tick, the cached reference tick and its freshness, the
-    ///         block that reference was last refreshed in, and the smoothed TWAP anchor the
-    ///         deviation cap checks it against.
     function poolState(PoolId poolId) external view returns (PoolState memory state) {
         return _poolState[poolId];
     }
 
     /// @notice How far a pool sits from its reference price, signed for a given direction.
-    /// @dev Serves the cached reading, so this is the same value the swap path would use.
-    ///      A caller must check `fresh` before acting: a stale reference means the hook has
-    ///      no view of the pool's drift, not that the drift is zero.
-    /// @param poolId The pool to measure.
-    /// @param zeroForOne Direction of the hypothetical swap.
+    /// @dev A caller must check `fresh` before acting: a stale reference means the hook has
+    ///      no view of the drift, not that the drift is zero.
     /// @return capturedTicks Positive when such a swap would trade toward the reference.
-    /// @return fresh Whether the cached reference is usable.
     function signedMispricing(PoolId poolId, bool zeroForOne)
         external
         view
@@ -172,15 +137,8 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     }
 
     /// @notice The pool's smoothed tick anchor and how far the cached reference sits from it.
-    /// @dev Exposes the deviation-cap inputs directly, so an operator or dashboard can see
-    ///      why a reference was rejected rather than only that it was -- the same reasoning
-    ///      that gives `ReferenceDeviationCapTripped` its own event instead of folding into
-    ///      `ReferenceFreshnessChanged`.
-    /// @param poolId The pool to read.
-    /// @return twapTick The pool's smoothed tick anchor.
-    /// @return deviationTicks Signed distance from that anchor to the cached reference tick.
-    /// @return withinBound Whether that distance is inside the configured cap; always true
-    ///         when the cap is disabled (`maxReferenceDeviationTicks == 0`).
+    /// @dev Exposes the deviation-cap inputs so an operator can see why a reference was
+    ///      rejected, not only that it was.
     function referenceDeviation(PoolId poolId)
         external
         view
@@ -206,16 +164,13 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         );
     }
 
-    /// @dev Reads the reference source, tolerating any failure as an unusable reading.
-    ///      The oracle interface forbids reverting, but this hook cannot depend on a third
-    ///      party honouring that, so the conversion is guarded here as well.
+    /// @dev The oracle interface forbids reverting, but this hook cannot depend on a third
+    ///      party honouring that, so failure is guarded here too.
     ///
-    ///      `responded` separates "the oracle answered, and its answer is unusable" from
-    ///      "the call itself failed". The first is a real observation and settles the
-    ///      question for this block. The second is an anomaly -- an out-of-gas sub-call is
-    ///      the reachable one -- and must not be allowed to stand in for the first, or a
-    ///      caller who meters their own gas could retire the block's refresh without ever
-    ///      letting the oracle speak.
+    ///      `responded` separates "answered, and the answer is unusable" from "the call
+    ///      failed". The first settles the question for this block; the second must not be
+    ///      allowed to stand in for it, or a caller metering their own gas could retire the
+    ///      block's refresh without ever letting the oracle speak.
     function _readReference() private view returns (int24 referenceTick, bool fresh, bool responded) {
         try REFERENCE_ORACLE.referenceSqrtPriceX96{gas: ORACLE_READ_GAS_LIMIT}() returns (
             uint160 sqrtPriceX96, bool ok
@@ -229,16 +184,12 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         }
     }
 
-    /// @dev Rejects pools this hook cannot price. Both reverts are safe because they run at
-    ///      pool creation, before any liquidity exists; a revert on the swap path would brick
-    ///      the pool for every liquidity provider, which is why this is the only place the
-    ///      hook refuses anything.
-    ///
-    ///      v4 hooks are permissionless, so anyone may create a pool naming this one. The
-    ///      reference source describes exactly one pair -- its decimal scaling encodes those
-    ///      tokens -- so a pool of different assets would be quoted against a price for
-    ///      something else, and the hook would report that reading as fresh while doing it.
-    ///      Refusing at creation is the only point where refusal is free.
+    /// @dev Rejects pools this hook cannot price. v4 hooks are permissionless, so anyone may
+    ///      create a pool naming this one, and the reference describes exactly one pair --
+    ///      a pool of different assets would be quoted against a price for something else
+    ///      and reported fresh while doing it. This is the only place the hook refuses
+    ///      anything: it runs before any liquidity exists, so a revert here cannot brick a
+    ///      pool the way one on the swap path would.
     function _beforeInitialize(address, PoolKey calldata key, uint160)
         internal
         view
@@ -386,16 +337,11 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     ///      Kept in its own frame so its locals do not compete for stack slots with the
     ///      attribution and surcharge work in `afterSwap`.
     function _advanceReferenceInPlace(PoolId poolId, PoolState memory state) private {
-        // The TWAP sample is gated on its own tracker, separate from the oracle refresh
-        // below, and fires unconditionally -- once, and only once, per block, regardless of
-        // whether the oracle ever answers. It must not be allowed to retry: `state.lastTick`
-        // still holds wherever the pool stood at the end of the previous block only on the
-        // FIRST pass through this function this block; every swap after the first has
-        // already overwritten it with this block's own tick at the bottom of this function.
-        // A gate that could re-enter this branch mid-block -- which an earlier version of
-        // the oracle-retry logic below did, by sharing one tracker with this fold -- would
-        // let a manipulated same-block tick walk the anchor the deviation cap depends on to
-        // be immune to exactly that.
+        // Gated on its own tracker, separate from the oracle refresh below, so it fires once
+        // per block whether or not the oracle ever answers. It must not retry: `state.lastTick`
+        // holds the previous block's close only on the first pass; after that it is this
+        // block's own tick. Sharing one tracker with the oracle retry below let a manipulated
+        // same-block tick walk the very anchor the deviation cap relies on.
         if (state.lastSampleBlock != uint32(block.number)) {
             state.lastSampleBlock = uint32(block.number);
             state.twapTickX32 = PoolTwap.update(state.twapTickX32, state.lastTick, TWAP_LAMBDA_X32);
@@ -406,15 +352,10 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         // the cost is amortised across a block's swaps -- but the first swap of each block
         // still pays it in full, and that is the hook's most expensive path.
         if (state.lastBlock != uint32(block.number)) {
-            // Wall clock and block count should advance together. When they do not -- many
-            // seconds passing across very few blocks -- the chain stopped producing rather
-            // than this pool merely being quiet, and a quiet pool is the case this must not
-            // misread: an untraded hour still advances ~1,800 Base blocks, so its ratio is
-            // ordinary. A halt is the opposite shape, and it is the dangerous one, because
-            // it freezes the pool's tick and the feed's `updatedAt` at the same instant.
-            // They then still agree with each other while both disagree with the world, so
-            // the drift reads as zero at exactly the moment it is largest. Subtraction is
-            // done in uint32 so it stays correct across the type's own epoch rollover.
+            // Wall clock and block count should advance together. Many seconds across very
+            // few blocks means the chain stopped producing, not that the pool was quiet -- an
+            // untraded hour still advances ~1,800 Base blocks, so its ratio is ordinary.
+            // Subtraction is in uint32 so it survives the type's own epoch rollover.
             uint32 nowTruncated = uint32(block.timestamp);
             uint256 secondsElapsed = uint256(nowTruncated - state.lastRefreshAt);
             uint256 blocksElapsed = uint256(uint32(block.number) - state.lastBlock);
@@ -428,12 +369,10 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
 
             (int24 referenceTick, bool referenceFresh, bool responded) = _readReference();
 
-            // The block is only retired once the oracle has actually answered. A call that
-            // failed outright -- the reachable case being a caller who metered their gas so
-            // the sub-call ran out -- leaves the refresh owed, so the next swap in this
-            // block tries again on its own gas. Retiring the block on a failed call instead
-            // would let one cheap dust swap per block hold the pool at the ceiling fee
-            // indefinitely while the feed was healthy the whole time.
+            // Retired only once the oracle has answered. A call that failed outright leaves
+            // the refresh owed, so the next swap retries on its own gas -- otherwise one
+            // cheap dust swap per block could pin the pool at the ceiling fee while the feed
+            // was healthy throughout.
             if (responded) {
                 state.lastBlock = uint32(block.number);
                 state.lastRefreshAt = nowTruncated;
@@ -445,13 +384,10 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
                 referenceFresh = false;
             }
 
-            // A reading the oracle itself reports as fresh can still be rejected here: it
-            // disagrees with where the pool has actually been trading by more than the
-            // configured cap. Treating it identically to an unusable reading -- rather than
-            // adopting it and letting `FeeBlend` price against it -- is what closes the gap
-            // a compromised or misconfigured feed would otherwise leave: any error large
-            // enough to matter shows up as a large, sustained gap against the pool's own
-            // cost-to-manipulate trading history, not as a single flag this hook can miss.
+            // A reading the oracle reports as fresh can still be rejected here for
+            // disagreeing with where the pool has actually traded by more than the cap. This
+            // is the only defence against a compromised feed: an error large enough to matter
+            // shows up as a sustained gap against the pool's own cost-to-manipulate history.
             if (
                 referenceFresh
                     && !PoolTwap.withinBound(state.twapTickX32, referenceTick, MAX_REFERENCE_DEVIATION_TICKS)

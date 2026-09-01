@@ -1,3 +1,4 @@
+import type { FeeParams } from "@/lib/protocol/feeBlend";
 import { DEPLOYED, GAS } from "@/lib/protocol/config";
 import { quote } from "@/lib/protocol/feeBlend";
 import { quoteExactInput, type PoolCurve } from "@/lib/protocol/swapMath";
@@ -90,6 +91,14 @@ export function buildScenario(
   referenceTick: number | undefined,
   gasPriceWei: bigint | undefined,
   input: ScenarioInput,
+  /**
+   * The hook's own bounds and freshness, read from chain. Defaulted to the compiled
+   * constants so the pure tests stay terse, but the app passes the live values: a stale
+   * reference makes the contract charge the ceiling, and a panel labelled "the fee the hook
+   * will quote" has to agree with that rather than with this build's assumptions.
+   */
+  bounds: FeeParams = DEPLOYED,
+  referenceFresh: boolean = true,
 ): Scenario | undefined {
   if (!curve || referenceTick === undefined) return undefined;
 
@@ -108,7 +117,7 @@ export function buildScenario(
   // the UI says which side moved rather than implying the oracle did.
   const dislocationIn = BigInt(Math.max(1, Math.round(input.dislocationUsdc * USDC)));
   const dislocationDrift = signedDrift(referenceTick, initial.tick, true);
-  const dislocationFee = quote(dislocationDrift, true, DEPLOYED);
+  const dislocationFee = quote(dislocationDrift, referenceFresh, bounds);
   const dislocationSwap = quoteExactInput(curve, dislocationIn, dislocationFee, true);
 
   if (dislocationSwap.amountOut === 0n) {
@@ -141,7 +150,7 @@ export function buildScenario(
   // surcharges. Sizing it from the WETH the first leg produced keeps this the trade an
   // arbitrageur would actually place rather than an arbitrary amount.
   const arbitrageDrift = signedDrift(referenceTick, dislocated.tick, false);
-  const arbitrageFee = quote(arbitrageDrift, true, DEPLOYED);
+  const arbitrageFee = quote(arbitrageDrift, referenceFresh, bounds);
 
   // The WETH the previous leg produced is the natural size: it is exactly what is needed to
   // walk the price back, scaled by how much of the gap the arbitrageur chooses to close.

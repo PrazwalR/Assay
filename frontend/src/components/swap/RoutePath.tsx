@@ -1,13 +1,11 @@
 "use client";
 
 import { AssayMark } from "@/components/brand/AssayMark";
-import { useAssay } from "@/components/Providers";
 import { useSwapQuote } from "@/hooks/useSwapQuote";
 import { CONTRACTS, explorerAddress, shortAddress } from "@/lib/protocol/config";
 import { signed } from "@/lib/format";
 
 export function RoutePath() {
-  const { dataMode } = useAssay();
   const { inToken, outToken, poolTick, referenceTick, feePips } = useSwapQuote();
 
   return (
@@ -41,9 +39,7 @@ export function RoutePath() {
         </RouteRow>
         <RouteRow label="reference">
           <span className="text-text-dim">
-            {dataMode === "testnet"
-              ? `${shortAddress(CONTRACTS.oracleAdapter)} · cached`
-              : "Chainlink ETH/USD · cached"}
+            {shortAddress(CONTRACTS.oracleAdapter)} · cached
           </span>
         </RouteRow>
         <RouteRow label="pool tick / reference tick">

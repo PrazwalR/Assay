@@ -27,12 +27,13 @@ source-verified on Basescan.
 | Liquidity router | [`0xA0a08ed6bBa5c790c8FF296DE5006ffC672d8599`](https://sepolia.basescan.org/address/0xA0a08ed6bBa5c790c8FF296DE5006ffC672d8599) |
 | Permission mask | `0x30C4` |
 
-The deployed runtime bytecode is 10,811 bytes and reproduces byte-for-byte from this
-checkout, which is why `foundry.toml` disables `bytecode_hash` and `cbor_metadata`. Two
-earlier builds are superseded at this address: `0x188FAc39…30C4` predates removing the
-variance and order-flow subsystem, and `0xa3A9901c…B5b0c4` (9,625 bytes) predates the
-reference-deviation cap. Each change altered the bytecode and therefore the mined CREATE2
-address. None of the superseded deployments held value.
+The current source compiles to 12,203 bytes of runtime bytecode, reproducing byte-for-byte
+from this checkout, which is why `foundry.toml` disables `bytecode_hash` and `cbor_metadata`.
+
+**The addresses above are a previous deployment and are superseded.** They predate the audit
+fixes in this tree — the reference-refresh move, the surcharge cap, the oracle gas stipends,
+the halt detector — so the code running at them is not the code here. Nothing has been
+redeployed since. No deployment has ever held value.
 
 **The adverse-selection gate does not currently pass.** AUC came in at 0.7485 against a 0.75
 floor, on 91 positive examples against a floor of 100, with the weakest walk-forward fold at
@@ -44,9 +45,9 @@ app's docs (`frontend/src/components/docs/pages.tsx`, the `Risk` component; serv
 ## How it works
 
 ```
-beforeSwap   read one storage slot -> signed drift vs cached reference -> fee, clamped
-afterSwap    advance the tick, refresh the reference at most once per block,
-             and on extreme dislocation donate the fee-cap overflow to in-range LPs
+beforeSwap   refresh the reference at most once per block -> signed drift -> fee, clamped
+afterSwap    record the tick this swap left behind, and on extreme dislocation
+             donate the fee-cap overflow to in-range LPs
 ```
 
 The fee formula is the no-arbitrage band, not a fitted model. An arbitrageur profits only
@@ -66,17 +67,16 @@ src/
   libraries/Mispricing.sol       signed drift, in ticks
   libraries/FeeBlend.sol         drift -> fee, and the fee-cap overflow
   libraries/ToxicitySurcharge.sol  overflow -> token amount
+  libraries/PoolTwap.sol         the pool's own smoothed tick, and the deviation cap
   libraries/Q32x32.sol           fixed point
-  libraries/VarianceEwma.sol     realised variance   (not on the swap path; see below)
-  libraries/OrderFlowImbalance.sol  order-flow imbalance  (likewise)
   oracle/ChainlinkReferenceAdapter.sol   a feed, presented as a v4 sqrt price
 calibration/                     the Python pipeline that measures whether any of this works
 ```
 
-`VarianceEwma` and `OrderFlowImbalance` are **not** on the swap path. Calibration measured
-their incremental value over the reference signal alone at −0.008 and −0.002 across two
-independent windows, so they were removed from the hook rather than left to bill every swap
-for nothing. The libraries remain, pure and tested, for a milestone that can show they earn
+Realised variance and order-flow imbalance were previously maintained here and have been
+removed entirely: calibration measured their incremental value over the reference signal at
+−0.008 and −0.002 across two independent windows, so they were billing every swap to make the
+classifier no better. They are recoverable from git history if a milestone can show they earn
 their cost.
 
 ## Gas
@@ -86,17 +86,18 @@ ever described the cheapest one.
 
 | path | measured | budget |
 | --- | --- | --- |
-| ordinary swap | 14,572 | 20,000 |
-| block boundary (reference refresh) | 30,901 + ~16,500 live-feed premium | 55,000 |
-| extreme dislocation (surcharge) | 48,582 | 55,000 |
+| ordinary swap | 16,180 | 20,000 |
+| block boundary (reference refresh) | 36,349 + ~16,500 live-feed premium | 55,000 |
+| extreme dislocation (surcharge) | 28,617 | 55,000 |
 
 A live Chainlink read measures 20,774 gas against the Base Sepolia aggregator, which is why
-the reference is cached and refreshed at most once per block rather than read per swap.
+the reference is cached and refreshed at most once per block rather than read per swap. Full
+detail, and why the boundary path's headroom is now 4%, in [`docs/gas.md`](docs/gas.md).
 
 ## Tests
 
 ```
-forge test                            156 tests
+forge test                            193 tests
 forge test --match-path "test/invariant/*"   7 stateful properties, 8,192 calls each
 ```
 

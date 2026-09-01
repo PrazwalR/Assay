@@ -20,8 +20,6 @@ library ToxicitySurcharge {
     ///      unspecified currency is the other one, and its post-swap delta magnitude is the
     ///      swap's notional in that currency -- the same quantity an ordinary LP fee is a
     ///      percentage of.
-    /// @param params The swap being priced.
-    /// @param delta The balance delta the core swap produced, before any hook adjustment.
     /// @return currency0IsUnspecified Whether currency0 is the unspecified side.
     /// @return magnitude The unspecified side's notional, always non-negative.
     function unspecifiedAmount(SwapParams calldata params, BalanceDelta delta)
@@ -35,7 +33,7 @@ library ToxicitySurcharge {
         unchecked {
             // Two's-complement negation: unary minus on type(int128).min overflows, and this
             // runs on the swap path where a revert is unacceptable. `magnitude` mirrors
-            // OrderFlowImbalance's identical guard for the same reason. Both branches
+            // Both branches
             // reinterpret the full 128-bit word and neither truncates.
             // forge-lint: disable-next-line(unsafe-typecast)
             magnitude = raw < 0 ? uint256(uint128(~raw)) + 1 : uint256(uint128(raw));
@@ -48,9 +46,6 @@ library ToxicitySurcharge {
     ///      `FeeBlend.MAX_OVERFLOW_PIPS`, the denominator is `PIPS_DENOMINATOR`, and
     ///      `FullMath.mulDiv` carries a 512-bit
     ///      intermediate, so this cannot overflow regardless of `notional`.
-    /// @param notional The unspecified side's swap magnitude, from `unspecifiedAmount`.
-    /// @param overflowPips The cap overflow from `FeeBlend.ceilingOverflowPips`, in pips.
-    /// @return amount The amount to take from the swapper and donate to liquidity providers.
     function surchargeAmount(uint256 notional, uint24 overflowPips) internal pure returns (uint256 amount) {
         // The denominator is FeeBlend's own overflow ceiling, imported rather than repeated.
         // The guarantee that the surcharge never exceeds `notional` -- which is what makes

@@ -4,21 +4,15 @@ pragma solidity 0.8.26;
 import {Mispricing} from "./Mispricing.sol";
 
 /// @notice Turns a swap's signed mispricing into the fee it should be quoted.
-/// @dev The mechanism is the no-arbitrage band, not a fitted model. An arbitrageur profits
-///      only when the drift they capture exceeds what they pay to capture it, so a fee set
-///      as a share of that drift takes back part of what would otherwise be extracted while
-///      leaving the trade worth doing. That matters: a fee large enough to deter arbitrage
-///      entirely leaves the pool stale, which drives away the uninformed flow that is the
-///      liquidity provider's only revenue.
+/// @dev The no-arbitrage band, not a fitted model. An arbitrageur profits only when the
+///      drift they capture exceeds what they pay for it, so a fee set as a share of that
+///      drift takes back part of the extraction while leaving the trade worth doing -- a fee
+///      large enough to deter arbitrage entirely leaves the pool stale, which drives away the
+///      uninformed flow that is the LP's only revenue.
 ///
 ///      Flow trading *away* from the reference captures nothing, so its mispricing is
-///      negative and it is quoted below the base fee. That is the entire per-swap
-///      discrimination: two swaps in one block, against the same drift, in opposite
-///      directions, are quoted differently.
-///
-///      This is deliberately not the growth-optimal curve f*(v) from the design. That curve
-///      needs three parameters that have not been estimated from data, and inventing them
-///      would be worse than shipping a mechanism whose single parameter is honest.
+///      negative and it is quoted below base. That is the entire per-swap discrimination:
+///      two swaps in one block, same drift, opposite directions, quoted differently.
 library FeeBlend {
     /// @dev Bound applied to the drift before it is scaled. `Mispricing` already clamps to
     ///      this, but the parameter is a plain int256 and this function runs on the swap
@@ -45,16 +39,11 @@ library FeeBlend {
     ///      not a bound on it -- `MAX_OVERFLOW_PIPS` below is the bound.
     uint24 internal constant PIPS_DENOMINATOR = 1_000_000;
 
-    /// @dev Ceiling on the toxicity surcharge, as a share of the swap's notional.
-    ///
-    ///      This was previously `PIPS_DENOMINATOR` itself, which meant the surcharge was
-    ///      bounded only at 100% of notional -- a bound in name only, and one no integrator
-    ///      could price against. The surcharge exists to catch dislocations too large for a
-    ///      percentage fee to express, which for the deployed configuration begins at
-    ///      roughly 950 ticks of drift (a ~10% price move). At 2% this still covers that
-    ///      case and everything up to ~35% of price movement before binding, while capping
-    ///      what any single swap can be charged beyond the LP fee -- and, with it, what an
-    ///      attacker who manufactures drift can extract from the swap that follows theirs.
+    /// @dev Ceiling on the toxicity surcharge, as a share of notional. Previously this was
+    ///      `PIPS_DENOMINATOR` itself -- a 100%-of-notional bound in name only, which no
+    ///      integrator could price against. At 2% it still covers every dislocation up to
+    ///      ~35% of price movement, while capping what an attacker who manufactures drift
+    ///      can extract from the swap that follows theirs.
     uint24 internal constant MAX_OVERFLOW_PIPS = 20_000;
 
     /// @dev The share-of-drift computation shared by `quote` and `ceilingOverflowPips`, kept
@@ -89,12 +78,6 @@ library FeeBlend {
     /// @notice The fee to quote for a swap.
     /// @dev Total over its whole input domain. This runs inside `beforeSwap`, where a revert
     ///      would make the pool untradeable for everyone, so every path returns a value.
-    /// @param signedMispricingTicks Drift this swap captures; negative when it trades away.
-    /// @param referenceFresh Whether the mispricing reading can be trusted.
-    /// @param baseFeePips Fee quoted when the pool sits at its reference.
-    /// @param minFeePips Floor on any quote.
-    /// @param maxFeePips Ceiling on any quote.
-    /// @param captureShareBps Share of captured drift to charge, in basis points.
     /// @return feePips The quoted fee, always within [minFeePips, maxFeePips].
     function quote(
         int256 signedMispricingTicks,
@@ -135,11 +118,6 @@ library FeeBlend {
     ///      losing it to the cap. It is zero whenever the reference is stale: with no trusted
     ///      drift reading there is nothing to attribute an overflow to, and `quote` is already
     ///      charging the ceiling through the ordinary path in that case.
-    /// @param signedMispricingTicks Drift this swap captures; negative when it trades away.
-    /// @param referenceFresh Whether the mispricing reading can be trusted.
-    /// @param baseFeePips Fee quoted when the pool sits at its reference.
-    /// @param maxFeePips Ceiling `quote` applies.
-    /// @param captureShareBps Share of captured drift to charge, in basis points.
     /// @return overflowPips The amount by which the uncapped formula exceeds `maxFeePips`,
     ///         zero if it does not, bounded by `MAX_OVERFLOW_PIPS` regardless of input.
     function ceilingOverflowPips(

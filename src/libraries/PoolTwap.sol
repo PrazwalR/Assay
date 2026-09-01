@@ -10,7 +10,7 @@ import {Q32x32} from "./Q32x32.sol";
 ///
 ///      The anchor has to be something an attacker cannot move cheaply within the same
 ///      transaction that needs it to look a certain way, which a per-swap or per-transaction
-///      price is not -- see `VarianceEwma` for the identical reasoning applied to a different
+///      price is not.
 ///      estimator. Sampling the *block-open* tick specifically, not the current one, is what
 ///      makes this resistant to being moved from inside the very block whose deviation check
 ///      it feeds: by the time any swap in a new block reads this, the sample already folded
@@ -29,11 +29,6 @@ library PoolTwap {
     }
 
     /// @dev Folds one block's opening tick into the average.
-    /// @param twapTickX32 The average before this block's sample.
-    /// @param blockOpenTick The pool's tick as of the end of the previous block.
-    /// @param lambdaX32 Weight retained from `twapTickX32`; MUST be in `(0, Q32x32.ONE]`, the
-    ///        same precondition `Q32x32.blendSigned` places on its own `lambda` argument.
-    /// @return updated The new average, in the same Q32.32 encoding.
     function update(int64 twapTickX32, int24 blockOpenTick, uint64 lambdaX32)
         internal
         pure

@@ -1,6 +1,5 @@
 "use client";
 
-import { useAssay } from "@/components/Providers";
 import { useLiveProtocol } from "@/hooks/useLiveProtocol";
 import { useSwapQuote } from "@/hooks/useSwapQuote";
 import { num } from "@/lib/format";
@@ -18,7 +17,9 @@ import { DEPLOYED, ROUTERS, shortAddress } from "@/lib/protocol/config";
  * says so, because treating it as an identity is the mistake this event invites.
  */
 export function EventLog() {
-  const { feePips, twinFeePips, overflowPips, referenceFresh, tone } = useAssay();
+  // Sourced from the live quote, not the landing page's animated walk: this panel
+  // claims to mirror "the quote above", and it now actually does.
+  const { feePips, twinFeePips, overflowPips, referenceFresh, tone } = useSwapQuote();
   const { blockNumber } = useLiveProtocol();
   const { feePaidOut, outToken } = useSwapQuote();
 

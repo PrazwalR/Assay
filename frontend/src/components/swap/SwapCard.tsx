@@ -14,11 +14,13 @@ import { GAS } from "@/lib/protocol/config";
 import { formatGasCostUsd, gasCostUsd } from "@/lib/protocol/gasCost";
 
 export function SwapCard() {
-  const { tone, toneText, amountIn, setAmountIn, flipDirection, openModal } = useAssay();
+  const { amountIn, setAmountIn, flipDirection, openModal } = useAssay();
   const { blockNumber, gasPriceWei, referenceUsd } = useLiveProtocol();
   const swap = useSwapQuote();
 
   const {
+    tone,
+    toneText,
     inToken,
     outToken,
     amount,
@@ -268,7 +270,9 @@ export function SwapCard() {
 
       <div className="mt-3 flex items-center justify-center gap-2 font-mono text-[11px] leading-none text-text-muted">
         <span
-          className={`size-[5px] rounded-full ${referenceFresh ? "bg-benign" : "bg-warm"}`}
+          className={`size-[5px] rounded-full ${
+            !driftIsLive ? "bg-text-muted" : referenceFresh ? "bg-benign" : "bg-warm"
+          }`}
           style={{ animation: "assayPulse 2.6s ease-in-out infinite" }}
         />
         <span>
