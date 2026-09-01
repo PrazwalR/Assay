@@ -1,0 +1,21 @@
+title = "Assay gitleaks config"
+
+[extend]
+useDefault = true
+
+# Two confirmed false positives from the default `generic-api-key` rule, allowlisted by
+# exact commit SHA rather than by path or a broad rule -- so a real secret introduced in a
+# later commit to either file still gets caught; only these two specific, already-reviewed
+# commits are exempted.
+#
+# Both trip because the rule's entropy/key-value heuristic fires on ERC-20 token
+# comparisons (`tokenInSymbol === CURRENCY0.symbol`, `token.symbol === CURRENCY0.symbol`):
+# the word "token" plus a `===` comparison against a short, mixed-case, dotted identifier
+# reads as a key assigned a secret-like value. Confirmed as false positives by scanning the
+# current working tree directly (`gitleaks detect --no-git`), which finds nothing -- the
+# only hit is on these two historical diffs.
+[allowlist]
+  commits = [
+    "632e4814e5aa14f83b5077c3b6a25b143b7047a4", # frontend/src/lib/protocol/tokens.ts:59
+    "c4504a00867ea9c86e3692dc04554e1d0fd94a6f", # frontend/src/components/modals/TokenModal.tsx:49
+  ]
