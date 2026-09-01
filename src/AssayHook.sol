@@ -296,24 +296,36 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         return this.afterInitialize.selector;
     }
 
-    /// @dev Quotes the fee for this swap.
+    /// @dev Refreshes the pool's view of the reference, then quotes this swap against it.
     ///
-    ///      Everything this needs is already in one storage word: the cached reference tick
-    ///      and the pool's last tick. The mispricing is a subtraction and a sign, and the fee
-    ///      is a multiply and a clamp. No external call, no oracle read, no second slot.
+    ///      The refresh has to happen here, not in `afterSwap`. A reference adopted after the
+    ///      quote is a reference the quote could not see, so the swap that reacts first to an
+    ///      oracle move -- the one actually capturing the dislocation -- would be priced
+    ///      against the stale tick it is about to trade away from, and quoted at or below the
+    ///      base fee for it. Every swap arriving later would then be charged for a gap the
+    ///      first one had already taken. That inverts the mechanism: it discounts informed
+    ///      flow and taxes the flow that follows it.
+    ///
+    ///      The oracle read is still gated to once per block, so this costs no more in total
+    ///      than refreshing in `afterSwap` did; it is the same read, moved to the side of the
+    ///      swap that needs its answer.
     ///
     ///      Returns no delta: Assay never takes custody of swap principal, which is the
     ///      highest-severity finding class in v4 hook audits.
     function _beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata)
         internal
-        view
         override
         returns (bytes4, BeforeSwapDelta, uint24)
     {
+        PoolId poolId = key.toId();
+        PoolState memory state = _poolState[poolId];
+        _advanceReferenceInPlace(poolId, state);
+        _poolState[poolId] = state;
+
         return (
             this.beforeSwap.selector,
             BeforeSwapDeltaLibrary.ZERO_DELTA,
-            _quote(_poolState[key.toId()], params.zeroForOne) | LPFeeLibrary.OVERRIDE_FEE_FLAG
+            _quote(state, params.zeroForOne) | LPFeeLibrary.OVERRIDE_FEE_FLAG
         );
     }
 
@@ -331,14 +343,14 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         PoolId poolId = key.toId();
         PoolState memory state = _poolState[poolId];
 
-        // Snapshot the exact drift `beforeSwap` quoted against, before anything below
-        // mutates it. This swap moves the tick toward the reference, and a block boundary
-        // may refresh the reference itself, so measuring after would attribute a fee that
-        // was never charged and would size the surcharge against the wrong drift.
+        // The exact drift `beforeSwap` quoted against. `beforeSwap` already advanced the
+        // reference and wrote it back, and `state.lastTick` is not touched until the bottom
+        // of this function, so reading both here reproduces that quote exactly rather than
+        // re-deriving it from a state that has moved underneath.
         int256 quotedDrift = Mispricing.signedTicks(state.referenceTick, state.lastTick, params.zeroForOne);
         bool quotedFresh = state.referenceFresh;
 
-        _advanceStateInPlace(poolId, state);
+        _recordTickInPlace(poolId, state);
         _poolState[poolId] = state;
 
         emit SwapAssayed(
@@ -355,22 +367,25 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         );
     }
 
-    /// @dev Advances the pool's cached state, MUTATING `state` in place.
+    /// @dev Records where this swap left the pool. Runs on every swap, in `afterSwap`.
     ///
-    ///      `state` is a memory reference, so every assignment below is visible to the
-    ///      caller and there is no functional copy. Anything derived from the pre-swap
-    ///      state must be extracted BEFORE this is called -- see `quotedDrift` in
-    ///      `_afterSwap`. Taking a `PoolState memory` snapshot after this point aliases the
-    ///      mutated struct and silently yields post-swap values.
-    ///
-    ///      Kept in its own frame so its locals do not compete for stack slots with the
-    ///      attribution and surcharge work that follows.
-    function _advanceStateInPlace(PoolId poolId, PoolState memory state) private {
+    ///      `state` is a memory reference, so the assignment is visible to the caller.
+    function _recordTickInPlace(PoolId poolId, PoolState memory state) private view {
         // slot0 also carries the price and both fee fields; only the tick is needed here and
         // the rest are deliberately discarded.
         // slither-disable-next-line unused-return
         (, int24 tickNow,,) = poolManager.getSlot0(poolId);
+        state.lastTick = tickNow;
+    }
 
+    /// @dev Refreshes the pool's reference and TWAP anchor, MUTATING `state` in place.
+    ///
+    ///      Runs in `beforeSwap`, so the quote that follows sees the reading. `state` is a
+    ///      memory reference, so every assignment below is visible to the caller.
+    ///
+    ///      Kept in its own frame so its locals do not compete for stack slots with the
+    ///      attribution and surcharge work in `afterSwap`.
+    function _advanceReferenceInPlace(PoolId poolId, PoolState memory state) private {
         // The TWAP sample is gated on its own tracker, separate from the oracle refresh
         // below, and fires unconditionally -- once, and only once, per block, regardless of
         // whether the oracle ever answers. It must not be allowed to retry: `state.lastTick`
@@ -455,8 +470,6 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
                 emit ReferenceFreshnessChanged(poolId, referenceFresh);
             }
         }
-
-        state.lastTick = tickNow;
     }
 
     /// @dev Recovers the fee-cap overflow as a real token amount and routes it to in-range
