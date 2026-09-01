@@ -47,9 +47,14 @@ jobs:
       # measure the instrumented build rather than the shipped one. They gate in the test
       # step instead. Fork tests are excluded for the same reason as the Test step above --
       # network access, not instrumentation, but the same "don't run here" conclusion.
+      #
+      # --no-match-contract, not --no-match-path: forge coverage does not honor path-based
+      # exclusion the way `forge test` does -- verified directly, the excluded files still
+      # ran under instrumentation and both failure modes above showed up here. Contract-name
+      # exclusion actually works.
       - name: Coverage
         run: |
-          forge coverage --report lcov --report-file lcov.info             --no-match-coverage "(script|test)" --no-match-path "test/(gas|fork)/*"
+          forge coverage --report lcov --report-file lcov.info             --no-match-coverage "(script|test)" --no-match-contract "HookOverheadTest|LiveBaseSepoliaForkTest"
           python3 - <<'CHECK'
           import re, sys
           hit = found = 0
