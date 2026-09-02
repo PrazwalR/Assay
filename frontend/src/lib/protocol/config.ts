@@ -42,6 +42,12 @@ export const POOL = {
 export const POOL_MANAGER = "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408" as const;
 
 /**
+ * The block `AssayHook` was deployed in. Scanning for its events below this is wasted work, and
+ * without a floor the scan window grows without bound as the chain advances.
+ */
+export const HOOK_DEPLOY_BLOCK = 46_239_845n;
+
+/**
  * The single seeded position's tick range, from `script/SetupPool.s.sol`. Liquidity is constant
  * across it, which is what makes a single-range curve quote exact rather than approximate.
  */

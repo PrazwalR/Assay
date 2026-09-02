@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { useAssay } from "@/components/Providers";
 import { useLivePool } from "@/hooks/useLivePool";
+import { ActivityFeed } from "@/components/markets/ActivityFeed";
 import { ScatterChart } from "@/components/markets/ScatterChart";
 import { DEPLOYED, PERMISSION_MASK } from "@/lib/protocol/config";
 import { int, usdCompact } from "@/lib/format";
@@ -229,6 +230,8 @@ export function MarketsView() {
           </div>
         </div>
       </section>
+
+      <ActivityFeed />
     </main>
   );
 }

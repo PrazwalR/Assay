@@ -39,7 +39,12 @@ export const ALL_DOC_PAGES: DocPage[] = [
     slug: "v4-constraints",
     label: "v4 constraints",
     group: "Protocol",
-    toc: ["Permissions", "Dynamic fee handshake", "Hot path"],
+    toc: [
+      "Permissions",
+      "Dynamic fee handshake",
+      "Hot path",
+      "Where the hook's activity is visible",
+    ],
   },
   {
     slug: "invariants",

@@ -236,6 +236,27 @@ function V4Constraints() {
         a single packed storage slot and refreshed at most once per block. The common path makes
         no external call at all.
       </P>
+
+      <H2 id="finding-activity">Where the hook&apos;s activity is visible</H2>
+      <P>
+        A hook is never the recipient of a transaction. A swap goes to a router, the router calls
+        the <Code>PoolManager</Code>, and the <Code>PoolManager</Code> calls the hook — so on any
+        block explorer the hook&apos;s <em>Transactions</em> tab is permanently empty, and always
+        will be. Nothing has gone wrong when it looks that way.
+      </P>
+      <P>
+        The activity is real; it is visible as <Code>SwapAssayed</Code> events on the hook, and as
+        internal transactions from the <Code>PoolManager</Code>. The Markets page reads those
+        events directly, and the swap and simulation surfaces link each transaction to the
+        explorer as it confirms.
+      </P>
+      <P>
+        One field is deliberately not shown anywhere: <Code>sender</Code>. In{" "}
+        <Code>beforeSwap</Code> that argument is the <em>router</em>, not the trader — it is the
+        same address on every swap that routes the same way. Treating it as a user identity is a
+        well-known way to build a hook that can be trivially spoofed, so nothing here reads it as
+        one.
+      </P>
     </>
   );
 }
