@@ -8,18 +8,12 @@ import {
   DEPLOYED,
   FLOOR_BINDS_AT_TICKS,
   GAS,
-  PERMISSION_MASK,
 } from "@/lib/protocol/config";
 
 export default function OverviewPage() {
   return (
     <main>
       <section className="mx-auto max-w-[1240px] px-6 pt-[76px]">
-        <p className="mb-7 inline-flex items-center gap-2 rounded-[20px] border border-border-2 bg-surface-2 py-[5px] pl-2 pr-[11px] font-mono text-[11.5px] font-medium leading-none text-text-dim">
-          <span className="size-[5px] rounded-full bg-accent" />
-          Uniswap v4 hook · permission mask {PERMISSION_MASK}
-        </p>
-
         <h1 className="mb-[22px] max-w-[16em] text-[clamp(38px,5.4vw,74px)] font-semibold leading-[1.03] tracking-[-0.035em] text-balance">
           Volatility is the same for everyone in a block. Adverse selection is not.
         </h1>
@@ -34,7 +28,7 @@ export default function OverviewPage() {
         <div className="mb-16 flex flex-wrap gap-3">
           <Link
             href="/swap"
-            className="flex h-11 items-center rounded-[9px] bg-text px-5 text-sm font-semibold text-bg transition-transform hover:-translate-y-px hover:shadow-[0_6px_22px_rgb(231_234_236/0.16)]"
+            className="flex h-11 items-center rounded-[9px] bg-accent px-5 text-sm font-semibold text-bg transition-[transform,background-color] hover:-translate-y-px hover:bg-accent-hover hover:shadow-[0_6px_22px_rgb(79_195_232/0.28)]"
           >
             Open the exchange
           </Link>
