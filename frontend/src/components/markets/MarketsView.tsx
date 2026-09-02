@@ -20,10 +20,11 @@ import { CURRENCY0, CURRENCY1 } from "@/lib/protocol/tokens";
 /**
  * Markets.
  *
- * The pool is real, but two swaps is not a distribution, so every aggregate here is still a
- * fixture. Rather than scatter a dozen individual markers, the whole surface carries one
- * unmissable disclosure at the top — and the numbers still reconcile with each other, so the
- * shape of the thing being described is honest even though the magnitudes are illustrative.
+ * The pool is real and its individual quotes are read from chain by `ActivityFeed` below, but
+ * twelve swaps is not a distribution, so every *aggregate* here is still a fixture. Rather than
+ * scatter a dozen individual markers, the whole surface carries one unmissable disclosure at the
+ * top — and the numbers still reconcile with each other, so the shape of the thing being
+ * described is honest even though the magnitudes are illustrative.
  */
 export function MarketsView() {
   const { dataMode } = useAssay();
@@ -78,9 +79,10 @@ export function MarketsView() {
           <strong className="font-semibold text-warm">
             The pool is real; this page&apos;s aggregates are not yet.
           </strong>{" "}
-          The USDC/WETH pool is live on Base Sepolia with real liquidity, and it has been traded
-          twice — both times from the deploy script, which quoted 0.05% and 0.31% for the two
-          directions. Two swaps is not a distribution. Every aggregate below (volume, TVL trend,
+          The USDC/WETH pool is live on Base Sepolia with real liquidity and has been traded
+          twelve times, at quotes ranging from the 0.01% floor to 0.578%. Those individual quotes
+          are real and listed at the bottom of this page, read from the hook&apos;s own events.
+          Twelve swaps is still not a distribution, so every aggregate below (volume, TVL trend,
           the scatter, the histogram) remains an illustrative fixture showing the shape this
           surface reports once there is enough history to measure. The pool identity, the fee
           bounds and the reference are real.

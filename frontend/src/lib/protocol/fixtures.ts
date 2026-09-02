@@ -2,9 +2,9 @@
  * The only place fixture data lives.
  *
  * Everything here is a stand-in for something that cannot yet be *measured*. The pool is real
- * and live on Base Sepolia, but it has been traded twice — so its tick and its liquidity can be
- * read (see `hooks/useLivePool.ts`) while its volume, fee revenue and quote distribution cannot,
- * because two swaps is not a distribution. Those are what this file supplies.
+ * and live on Base Sepolia, but lightly traded -- so its tick and liquidity can be read (see
+ * `hooks/useLivePool.ts`) and its individual quotes are listed by `ActivityFeed`, while volume,
+ * fee revenue and a quote distribution cannot be. Those are what this file supplies.
  *
  * The reference price, the fee bounds, the pool tick and the signed drift are all live reads and
  * are not in this file.
