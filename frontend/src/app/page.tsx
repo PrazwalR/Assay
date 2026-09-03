@@ -29,7 +29,7 @@ export default function OverviewPage() {
         <div className="mb-16 flex flex-wrap gap-3">
           <Link
             href="/swap"
-            className="flex h-11 items-center rounded-[9px] bg-text px-5 text-sm font-semibold text-bg transition-[transform,background-color] hover:-translate-y-px hover:bg-white hover:shadow-[0_6px_22px_rgb(255_255_255/0.16)]"
+            className="flex h-11 items-center rounded-[9px] bg-accent-fill px-5 text-sm font-semibold text-white transition-[transform,background-color] hover:-translate-y-px hover:bg-accent-fill-hover hover:shadow-[0_6px_22px_rgb(79_195_232/0.28)]"
           >
             Open the exchange
           </Link>

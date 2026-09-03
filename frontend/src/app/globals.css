@@ -39,6 +39,18 @@
   --color-accent: #4fc3e8;
   --color-accent-hover: #8ad9f2;
 
+  /* The accent as a *fill* under white text. `--color-accent` is tuned to sit on the dark
+     ground as a foreground -- white on it is 2.04:1, well under the 4.5:1 AA floor, and thin
+     white type on pale blue is the first thing video compression destroys. Same hue (195) and
+     saturation, darkened until white clears AA. Fills only; the accent proper still owns every
+     foreground use listed above.
+
+     Hover deepens rather than lightens: any value light enough to read as a "lift" drops white
+     back under AA. The lift is carried by the translate and the shadow instead, which the
+     button already had. */
+  --color-accent-fill: #1580a2;
+  --color-accent-fill-hover: #126c89;
+
   /* Quote tones. Which one applies is a function of signed drift -- see
      lib/protocol/tone.ts, which is the single source of that mapping. */
   --color-benign: #5bd08c;
