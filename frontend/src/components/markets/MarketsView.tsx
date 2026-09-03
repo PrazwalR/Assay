@@ -6,6 +6,7 @@ import { useAssay } from "@/components/Providers";
 import { useLivePool } from "@/hooks/useLivePool";
 import { ActivityFeed } from "@/components/markets/ActivityFeed";
 import { LiveActivitySummary } from "@/components/markets/LiveActivitySummary";
+import { LiveQuoteChart } from "@/components/markets/LiveQuoteChart";
 import { DEMO_MODE } from "@/lib/demoMode";
 import { ScatterChart } from "@/components/markets/ScatterChart";
 import { DEPLOYED, PERMISSION_MASK } from "@/lib/protocol/config";
@@ -174,6 +175,14 @@ export function MarketsView() {
           </p>
         </section>
       </div>
+      )}
+
+      {/* The real counterpart to the fixture scatter above: same encoding, drawn from the
+          hook's own logs. Shown in demo mode precisely because it is not a fixture. */}
+      {DEMO_MODE && (
+        <div className="mb-5">
+          <LiveQuoteChart />
+        </div>
       )}
 
       <section className="overflow-hidden rounded-2xl border border-border-2 bg-surface">
