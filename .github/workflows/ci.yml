@@ -99,6 +99,45 @@ jobs:
         env:
           BASE_SEPOLIA_RPC_URL: ${{ secrets.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org' }}
 
+  # The frontend prices swaps in the browser using a TypeScript port of FeeBlend.sol, pinned
+  # to the same test/fixtures/fee_blend.json the Solidity and Python assert against. Without
+  # this job a divergence between the three only surfaces at deploy time, in Vercel's build,
+  # after the merge that caused it.
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      # --frozen-lockfile, so a package.json edited without regenerating the lockfile fails
+      # here rather than silently resolving to different versions than the ones tested.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      # No env vars set: every NEXT_PUBLIC_* read has a documented fallback, so a green build
+      # here also proves the app builds for someone who cloned it without configuring anything.
+      - name: Build
+        run: pnpm build
+
   analysis:
     runs-on: ubuntu-latest
     steps:
