@@ -75,7 +75,14 @@ export function useLiveProtocol(): LiveProtocol {
         baseFeePips: Number(feeBounds[0]),
         minFeePips: Number(feeBounds[1]),
         maxFeePips: Number(feeBounds[2]),
-        // Not exposed by the deployed hook; it is a constructor immutable with no getter.
+        // The one value here that cannot be read from chain. `CAPTURE_SHARE_BPS` is a
+        // `private immutable` set in the constructor (AssayHook.sol) and `feeBounds()` returns
+        // only the other three, so no call exposes it -- this is compiled in, not chosen.
+        //
+        // It is not unverified, though: `test_LiveSwap_MatchesLocalFeeBlendPrediction` in the
+        // fork suite predicts a fee using this exact constant, executes a real swap against the
+        // deployed bytecode, and asserts the emitted `SwapAssayed` matches. A wrong value here
+        // fails that test rather than silently mispricing the display.
         captureShareBps: DEPLOYED.captureShareBps,
       }
     : DEPLOYED;

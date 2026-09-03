@@ -84,11 +84,16 @@ export function TwinQuote() {
         </article>
       </div>
 
+      {/* The citation used to read "measured at 100 bp against 1 bp". That test asserts an
+          inequality -- `assertGt(capturingDrift, addingToDrift)` -- not those two figures, which
+          are simply the configured ceiling and floor. Cite what it actually proves. */}
       <p className="mt-[14px] text-[12px] leading-[1.55] text-text-muted">
         Spread of <span className="tnum text-text-dim">{spread.toFixed(2)} bp</span> between two
-        swaps a volatility-driven hook would quote identically. Measured in{" "}
-        <span className="font-mono">test/integration/DynamicPricing.t.sol</span> at 100 bp
-        against 1 bp.
+        swaps a volatility-driven hook would quote identically. Both figures above are computed
+        from the drift the hook itself reports.{" "}
+        <span className="font-mono">test/integration/DynamicPricing.t.sol</span> pins the
+        property on chain: in one block, against one reference, the swap capturing the drift is
+        quoted strictly higher than the swap adding to it.
       </p>
 
       <p className="mt-2 font-mono text-[10.5px] leading-none text-text-muted">
