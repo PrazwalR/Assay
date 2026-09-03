@@ -29,7 +29,7 @@ export default function OverviewPage() {
         <div className="mb-16 flex flex-wrap gap-3">
           <Link
             href="/swap"
-            className="flex h-11 items-center rounded-[9px] bg-accent px-5 text-sm font-semibold text-bg transition-[transform,background-color] hover:-translate-y-px hover:bg-accent-hover hover:shadow-[0_6px_22px_rgb(79_195_232/0.28)]"
+            className="flex h-11 items-center rounded-[9px] bg-text px-5 text-sm font-semibold text-bg transition-[transform,background-color] hover:-translate-y-px hover:bg-white hover:shadow-[0_6px_22px_rgb(255_255_255/0.16)]"
           >
             Open the exchange
           </Link>
@@ -106,20 +106,21 @@ export default function OverviewPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1240px] px-6 pb-[100px]">
-        <div className="rounded-2xl border border-warm/20 bg-[#100E0A] p-8">
-          <h2 className="mb-3 text-[20px] font-semibold leading-tight tracking-[-0.02em] text-warm">
-            What this does not yet show
-          </h2>
-          <p className="mb-4 max-w-[70ch] text-[14px] leading-[1.65] text-[#9A8B72] text-pretty">
-            The hook, its oracle and one USDC/WETH pool are live on Base Sepolia, and the
-            reference price above is read from the chain. The pool <LiveActivitySummary /> and
-            holds about $57 of depth — enough to show the hook pricing both directions of the
-            same pool in the same sequence, and not nearly enough to be a distribution. The
-            aggregates on the markets page — volume, TVL trend, the spread of quotes — are still
-            fixtures rather than measurements, and are labelled as such wherever they appear.
-          </p>
-          {!DEMO_MODE && (
+      {!DEMO_MODE && (
+        <section className="mx-auto max-w-[1240px] px-6 pb-[100px]">
+          <div className="rounded-2xl border border-warm/20 bg-[#100E0A] p-8">
+            <h2 className="mb-3 text-[20px] font-semibold leading-tight tracking-[-0.02em] text-warm">
+              What this does not yet show
+            </h2>
+            <p className="mb-4 max-w-[70ch] text-[14px] leading-[1.65] text-[#9A8B72] text-pretty">
+              The hook, its oracle and one USDC/WETH pool are live on Base Sepolia, and the
+              reference price above is read from the chain. The pool <LiveActivitySummary /> and
+              holds about $57 of depth — enough to show the hook pricing both directions of the
+              same pool in the same sequence, and not nearly enough to be a distribution. The
+              aggregates on the markets page — volume, TVL trend, the spread of quotes — are
+              still fixtures rather than measurements, and are labelled as such wherever they
+              appear.
+            </p>
             <p className="max-w-[70ch] text-[14px] leading-[1.65] text-[#9A8B72] text-pretty">
               Separately, the adverse-selection gate does not currently pass: the mechanism is
               implemented and the arithmetic is tested, but the evidence that it improves
@@ -130,9 +131,9 @@ export default function OverviewPage() {
               , because a claim this project cannot support is not one it should make on a
               landing page.
             </p>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
     </main>
   );
 }

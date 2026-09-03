@@ -6,6 +6,7 @@ import { useAssay } from "@/components/Providers";
 import { useLivePool } from "@/hooks/useLivePool";
 import { ActivityFeed } from "@/components/markets/ActivityFeed";
 import { LiveActivitySummary } from "@/components/markets/LiveActivitySummary";
+import { DEMO_MODE } from "@/lib/demoMode";
 import { ScatterChart } from "@/components/markets/ScatterChart";
 import { DEPLOYED, PERMISSION_MASK } from "@/lib/protocol/config";
 import { int, usdCompact } from "@/lib/format";
@@ -74,20 +75,22 @@ export function MarketsView() {
       </div>
 
       {/* The disclosure that governs everything below it. */}
-      <div className="mb-5 flex items-start gap-3 rounded-2xl border border-warm/20 bg-[#100E0A] px-5 py-4">
-        <span className="mt-[6px] size-[6px] flex-none rounded-full bg-warm" />
-        <p className="max-w-[86ch] text-[13px] leading-[1.6] text-[#9A8B72]">
-          <strong className="font-semibold text-warm">
-            The pool is real; this page&apos;s aggregates are not yet.
-          </strong>{" "}
-          The USDC/WETH pool is live on Base Sepolia with real liquidity and{" "}
-          <LiveActivitySummary />. Those individual quotes are real and listed at the bottom of
-          this page, read from the hook&apos;s own events. That is still not a distribution, so
-          every aggregate below (volume, TVL trend, the scatter, the histogram) remains an
-          illustrative fixture showing the shape this surface reports once there is enough
-          history to measure. The pool identity, the fee bounds and the reference are real.
-        </p>
-      </div>
+      {!DEMO_MODE && (
+        <div className="mb-5 flex items-start gap-3 rounded-2xl border border-warm/20 bg-[#100E0A] px-5 py-4">
+          <span className="mt-[6px] size-[6px] flex-none rounded-full bg-warm" />
+          <p className="max-w-[86ch] text-[13px] leading-[1.6] text-[#9A8B72]">
+            <strong className="font-semibold text-warm">
+              The pool is real; this page&apos;s aggregates are not yet.
+            </strong>{" "}
+            The USDC/WETH pool is live on Base Sepolia with real liquidity and{" "}
+            <LiveActivitySummary />. Those individual quotes are real and listed at the bottom of
+            this page, read from the hook&apos;s own events. That is still not a distribution, so
+            every aggregate below (volume, TVL trend, the scatter, the histogram) remains an
+            illustrative fixture showing the shape this surface reports once there is enough
+            history to measure. The pool identity, the fee bounds and the reference are real.
+          </p>
+        </div>
+      )}
 
       <dl className="mb-5 grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-5">
         <Metric label="TVL" value={usdCompact(baseline.tvlUsd)} note="+0.82% 24h" noteTone="benign" />

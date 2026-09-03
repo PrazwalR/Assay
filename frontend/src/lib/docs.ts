@@ -6,12 +6,11 @@
  * pager, the per-page table of contents and ⌘K search all derive from this one array, so a page
  * cannot appear in one and be missing from another.
  *
- * That single derivation is also what makes `DEMO_MODE` safe to express here: filtering the
- * exported array withholds a page from the sidebar, the pager, search and `generateStaticParams`
- * at once, so a hidden page cannot be reachable from one surface and missing from another.
+ * Every page here is always built and always reachable. `DEMO_MODE` used to filter this array to
+ * withhold the Assurance pages, which made them 404 rather than merely unlinked — and one of
+ * them, `risk`, is what the demo's closing shot exists to show. The flag now hides repeated
+ * chrome only; see `demoMode.ts`.
  */
-
-import { DEMO_HIDDEN_DOCS, DEMO_MODE } from "@/lib/demoMode";
 
 export interface DocPage {
   slug: string;
@@ -66,14 +65,8 @@ export const ALL_DOC_PAGES: DocPage[] = [
   },
 ];
 
-/**
- * The pages this build presents. Identical to `ALL_DOC_PAGES` unless `DEMO_MODE` is on, in
- * which case the Assurance pages it names are withheld — from the nav, the pager, search and
- * the statically generated routes alike, since all four read this array.
- */
-export const DOC_PAGES: DocPage[] = DEMO_MODE
-  ? ALL_DOC_PAGES.filter((page) => !DEMO_HIDDEN_DOCS.includes(page.slug))
-  : ALL_DOC_PAGES;
+/** The pages this build presents. Every mode presents all of them. */
+export const DOC_PAGES: DocPage[] = ALL_DOC_PAGES;
 
 export const findDoc = (slug: string) => DOC_PAGES.find((page) => page.slug === slug);
 
