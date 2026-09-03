@@ -77,15 +77,17 @@ function Introduction() {
           ["Permission mask", <Code key="mask">{PERMISSION_MASK}</Code>],
         ]}
       />
-      <Callout tone="warm" title="One pool, twelve swaps">
+      <Callout tone="warm" title="One pool, a few dozen swaps">
         The hook, its oracle and a USDC/WETH pool are live, and the reference price on the
-        overview is a live contract read. The pool has now been traded twelve times, and the{" "}
-        <Code>SwapAssayed</Code> events span <strong className="text-text">100 to 5,780 pips</strong>
-        {" "}— from the 1 basis point floor to 57.8 basis points, a fifty-seven-fold spread on one
-        pool. Swaps trading away from the reference take the floor; swaps closing the gap pay for
-        what they capture. That is the mechanism doing the only thing it claims to do, and every
-        quote is on chain. What still does not exist is <em>volume</em>, so the aggregates on the
-        markets page remain labelled fixtures — twelve swaps is not a distribution.
+        overview is a live contract read. Every swap the hook has priced is on chain as a{" "}
+        <Code>SwapAssayed</Code> event, and they span from the 1 basis point floor up to tens of
+        basis points on the same pool. Swaps trading away from the reference take the floor;
+        swaps closing the gap pay for what they capture. That is the mechanism doing the only
+        thing it claims to do. The running count and the exact range are read live on the{" "}
+        <strong className="text-text">markets page</strong> rather than written here, because a
+        number typed into prose about a live pool stops being true the next time someone trades.
+        What still does not exist is <em>volume</em>, so the aggregates on that page remain
+        labelled fixtures — a few dozen swaps is not a distribution.
       </Callout>
     </>
   );

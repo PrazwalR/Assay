@@ -13,8 +13,8 @@ import { referenceUsdFrom } from "@/lib/protocol/reference";
  *
  * These reads work against the real deployment on Base Sepolia and are verified to respond.
  * The pool's own state is read separately in `useLivePool`. What remains a fixture is anything
- * requiring *history* -- volume, fee revenue, the quote distribution -- because twelve swaps is
- * not a distribution.
+ * requiring *history* -- volume, fee revenue, the quote distribution -- because a few dozen
+ * swaps is not a distribution.
  *
  * `isLive` is what components gate their "live" badge on. It is false while loading and false
  * on any read failure, so the badge is never shown optimistically.

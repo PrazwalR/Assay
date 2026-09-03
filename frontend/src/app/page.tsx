@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { QuoteCurve } from "@/components/quote/QuoteCurve";
 import { LiveReferenceStrip } from "@/components/quote/LiveReferenceStrip";
+import { LiveActivitySummary } from "@/components/markets/LiveActivitySummary";
 import { DEMO_MODE } from "@/lib/demoMode";
 import {
   CAP_BINDS_AT_TICKS,
@@ -112,13 +113,11 @@ export default function OverviewPage() {
           </h2>
           <p className="mb-4 max-w-[70ch] text-[14px] leading-[1.65] text-[#9A8B72] text-pretty">
             The hook, its oracle and one USDC/WETH pool are live on Base Sepolia, and the
-            reference price above is read from the chain. The pool has now been traded{" "}
-            <strong className="font-semibold">nine times</strong> and holds about $57 of depth —
-            enough to show the hook pricing both directions of the same pool in the same
-            sequence (quotes ranged from the 100-pip floor to 4,700 pips), and not nearly enough
-            to be a distribution. The aggregates on the markets page — volume, TVL trend, the
-            spread of quotes — are still fixtures rather than measurements, and are labelled as
-            such wherever they appear.
+            reference price above is read from the chain. The pool <LiveActivitySummary /> and
+            holds about $57 of depth — enough to show the hook pricing both directions of the
+            same pool in the same sequence, and not nearly enough to be a distribution. The
+            aggregates on the markets page — volume, TVL trend, the spread of quotes — are still
+            fixtures rather than measurements, and are labelled as such wherever they appear.
           </p>
           {!DEMO_MODE && (
             <p className="max-w-[70ch] text-[14px] leading-[1.65] text-[#9A8B72] text-pretty">
