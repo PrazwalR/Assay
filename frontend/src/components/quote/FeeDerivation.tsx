@@ -7,7 +7,7 @@ import { useLiveProtocol } from "@/hooks/useLiveProtocol";
 import { useSwapQuote } from "@/hooks/useSwapQuote";
 import { CAP_BINDS_AT_TICKS } from "@/lib/protocol/config";
 import { ceilingOverflowPips, rawQuotedPips } from "@/lib/protocol/feeBlend";
-import { num, signed } from "@/lib/format";
+import { signed, tokenAmount } from "@/lib/format";
 
 const METER_MIN = -300;
 const METER_MAX = 1200;
@@ -182,7 +182,7 @@ export function FeeDerivation() {
 
       <p className="border-t border-border px-5 py-3 font-mono text-[11.5px] leading-[1.5] text-text-muted">
         {driftIsLive ? "live drift, read from the hook" : "drift simulated"} · this swap pays{" "}
-        {num(feePaidOut, outToken.displayDecimals)} {outToken.symbol} in fees
+        {tokenAmount(feePaidOut, outToken.displayDecimals)} {outToken.symbol} in fees
       </p>
     </section>
   );

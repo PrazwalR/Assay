@@ -11,6 +11,27 @@ export const num = (value: number, decimals: number) =>
 
 export const usd = (value: number) => `$${num(value, 2)}`;
 
+/**
+ * A token amount that may be far smaller than its display precision.
+ *
+ * `num(value, displayDecimals)` is right for balances and outputs, where the token's own
+ * convention is what a trader expects to read. It is wrong for a fee: a 1 bp charge on a
+ * 0.00189 WETH output is 0.000000189 WETH, which renders as "0.00000" at WETH's five places and
+ * reads as *free* -- on the one panel whose entire subject is what the swap is being charged.
+ *
+ * So precision follows the magnitude rather than the token, the same way `formatGasCostUsd`
+ * handles sub-cent gas. A genuine zero still prints as "0": nothing here invents a charge that
+ * is not there.
+ */
+export const tokenAmount = (value: number, displayDecimals: number) => {
+  if (value === 0) return "0";
+  const magnitude = Math.abs(value);
+  if (magnitude >= 10 ** -displayDecimals) return num(value, displayDecimals);
+  // Below the token's own precision, keep three significant figures so the number stays a
+  // number. `toPrecision` gives exponent form for very small values; expand it.
+  return Number(value.toPrecision(3)).toLocaleString("en-US", { maximumFractionDigits: 20 });
+};
+
 /** Compact USD for metric tiles, where four significant figures is the useful resolution. */
 export const usdCompact = (value: number) => {
   if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
