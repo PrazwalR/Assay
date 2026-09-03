@@ -10,6 +10,7 @@ import { BASE_SEPOLIA_CHAIN_ID, explorerTx } from "@/lib/protocol/config";
 import { useLiveProtocol } from "@/hooks/useLiveProtocol";
 import { DEMO_MODE } from "@/lib/demoMode";
 import { pipsToBp, pipsToPct, signed, usd } from "@/lib/format";
+import { formatGasCostUsd } from "@/lib/protocol/gasCost";
 import type { ExecutedTx, Scenario } from "@/lib/simulation/types";
 
 /**
@@ -408,7 +409,7 @@ function emittedFeePips(tx: ExecutedTx | undefined): number | undefined {
  *        false of the numbers on screen, which were recomputed projections in every state.
  */
 function FeeComparison({ scenario, txs }: { scenario: Scenario; txs: ExecutedTx[] }) {
-  const { bounds } = useLiveProtocol();
+  const { bounds, referenceUsd } = useLiveProtocol();
   const { economics, arbitrageLeg } = scenario;
   const ratio = economics.flatFeeToLpUsd > 0 ? economics.feeToLpUsd / economics.flatFeeToLpUsd : 0;
 
@@ -421,6 +422,20 @@ function FeeComparison({ scenario, txs }: { scenario: Scenario; txs: ExecutedTx[
 
   const arbitrageFee = arbitrageEmitted ?? arbitrageLeg.feePips;
   const dislocationFee = dislocationEmitted ?? scenario.dislocationLeg.feePips;
+
+  // What the run actually cost, summed from receipts. The projection above it assumes one swap
+  // on the block-boundary path plus one approval; a real run is two swaps and however many
+  // approvals the wallet still needed, so the two can differ by more than rounding. Reported
+  // only once every leg has a receipt, and never mixed into the projected figure.
+  const spentWei = txs.reduce(
+    (total, tx) =>
+      tx.gasUsed !== undefined && tx.effectiveGasPrice !== undefined
+        ? total + tx.gasUsed * tx.effectiveGasPrice
+        : total,
+    0n,
+  );
+  const gasPaidUsd =
+    executed && spentWei > 0n ? (Number(spentWei) / 1e18) * referenceUsd : undefined;
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border-2 bg-surface">
@@ -465,6 +480,13 @@ function FeeComparison({ scenario, txs }: { scenario: Scenario; txs: ExecutedTx[
             flat="not measured"
             assay={`${signed(arbitrageLeg.driftTicks)} ticks`}
           />
+          {gasPaidUsd !== undefined ? (
+            <Row
+              label="Gas actually paid, both legs"
+              flat="—"
+              assay={formatGasCostUsd(gasPaidUsd)}
+            />
+          ) : null}
         </tbody>
       </table>
 
