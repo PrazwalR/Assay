@@ -48,30 +48,44 @@ export function MarketsView() {
           </h1>
           <p className="max-w-[66ch] text-[14.5px] leading-[1.6] text-text-dim text-pretty">
             The hook refuses any pool whose currencies do not match the pair its oracle declares,
-            so there is exactly one market to describe. Everything below would be derived from{" "}
-            <span className="font-mono">SwapAssayed</span> events.
+            so there is exactly one market to describe.{" "}
+            {DEMO_MODE ? (
+              <>
+                Every figure shown is read from chain; the aggregates that would need trading
+                history to measure are withheld rather than illustrated.
+              </>
+            ) : (
+              <>
+                Everything below would be derived from{" "}
+                <span className="font-mono">SwapAssayed</span> events.
+              </>
+            )}
           </p>
         </div>
-        <div className="flex flex-none gap-2">
-          {RANGES.map((entry) => {
-            const active = entry.label === range;
-            return (
-              <button
-                key={entry.label}
-                type="button"
-                onClick={() => setRange(entry.label)}
-                aria-pressed={active}
-                className={`h-[30px] min-w-[44px] rounded-lg border px-[11px] font-mono text-xs font-medium leading-none transition-colors ${
-                  active
-                    ? "border-accent/40 bg-accent/10 text-accent"
-                    : "border-border-2 bg-surface-2 text-text-dim hover:border-border-hover"
-                }`}
-              >
-                {entry.label}
-              </button>
-            );
-          })}
-        </div>
+        {/* The range selector scales fixture aggregates only, so it has nothing to act on
+            once those are withheld. */}
+        {!DEMO_MODE && (
+          <div className="flex flex-none gap-2">
+            {RANGES.map((entry) => {
+              const active = entry.label === range;
+              return (
+                <button
+                  key={entry.label}
+                  type="button"
+                  onClick={() => setRange(entry.label)}
+                  aria-pressed={active}
+                  className={`h-[30px] min-w-[44px] rounded-lg border px-[11px] font-mono text-xs font-medium leading-none transition-colors ${
+                    active
+                      ? "border-accent/40 bg-accent/10 text-accent"
+                      : "border-border-2 bg-surface-2 text-text-dim hover:border-border-hover"
+                  }`}
+                >
+                  {entry.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* The disclosure that governs everything below it. */}
@@ -92,32 +106,35 @@ export function MarketsView() {
         </div>
       )}
 
-      <dl className="mb-5 grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-5">
-        <Metric label="TVL" value={usdCompact(baseline.tvlUsd)} note="+0.82% 24h" noteTone="benign" />
-        <Metric
-          label="Volume"
-          value={usdCompact(baseline.volumeUsd * factor)}
-          note={`${int(baseline.swaps * factor)} swaps`}
-        />
-        <Metric
-          label="LP fees"
-          value={usdCompact(baseline.feesUsd * factor)}
-          note={`${usdCompact(baseline.donatedUsd * factor)} donated`}
-        />
-        <Metric
-          label="Mean quote"
-          value={`${baseline.meanFeeBp.toFixed(2)} bp`}
-          note="volume-weighted"
-          valueTone="accent"
-        />
-        <Metric
-          label="Reference uptime"
-          value={baseline.uptime}
-          note={`${baseline.staleSpans} stale spans`}
-          noteTone="warm"
-        />
-      </dl>
+      {!DEMO_MODE && (
+        <dl className="mb-5 grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-5">
+          <Metric label="TVL" value={usdCompact(baseline.tvlUsd)} note="+0.82% 24h" noteTone="benign" />
+          <Metric
+            label="Volume"
+            value={usdCompact(baseline.volumeUsd * factor)}
+            note={`${int(baseline.swaps * factor)} swaps`}
+          />
+          <Metric
+            label="LP fees"
+            value={usdCompact(baseline.feesUsd * factor)}
+            note={`${usdCompact(baseline.donatedUsd * factor)} donated`}
+          />
+          <Metric
+            label="Mean quote"
+            value={`${baseline.meanFeeBp.toFixed(2)} bp`}
+            note="volume-weighted"
+            valueTone="accent"
+          />
+          <Metric
+            label="Reference uptime"
+            value={baseline.uptime}
+            note={`${baseline.staleSpans} stale spans`}
+            noteTone="warm"
+          />
+        </dl>
+      )}
 
+      {!DEMO_MODE && (
       <div className="mb-5 grid gap-5 lg:grid-cols-2">
         <ScatterChart range={range} />
 
@@ -157,6 +174,7 @@ export function MarketsView() {
           </p>
         </section>
       </div>
+      )}
 
       <section className="overflow-hidden rounded-2xl border border-border-2 bg-surface">
         <header className="flex items-center justify-between gap-4 border-b border-border px-5 pb-[15px] pt-[17px]">
@@ -198,17 +216,19 @@ export function MarketsView() {
               </span>
             </span>
           </div>
+          {/* These four are fixtures. With the disclosure withheld there is nothing on screen
+              saying so, and an unlabelled fabricated figure is worse than an absent one. */}
           <span className="tnum text-right text-[13.5px] leading-none">
-            {usdCompact(baseline.tvlUsd)}
+            {DEMO_MODE ? "—" : usdCompact(baseline.tvlUsd)}
           </span>
           <span className="tnum text-right text-[13.5px] leading-none">
-            {usdCompact(baseline.volumeUsd * factor)}
+            {DEMO_MODE ? "—" : usdCompact(baseline.volumeUsd * factor)}
           </span>
           <span className="tnum text-right text-[13.5px] leading-none">
-            {usdCompact(baseline.feesUsd * factor)}
+            {DEMO_MODE ? "—" : usdCompact(baseline.feesUsd * factor)}
           </span>
           <span className="tnum text-right text-[13.5px] leading-none text-accent">
-            {baseline.meanFeeBp.toFixed(2)} bp
+            {DEMO_MODE ? "—" : `${baseline.meanFeeBp.toFixed(2)} bp`}
           </span>
           <span
             className={`text-right font-mono text-xs leading-none ${
