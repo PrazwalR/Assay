@@ -6,10 +6,11 @@ import { useAccount, useSwitchChain } from "wagmi";
 import { useAssay } from "@/components/Providers";
 import { useSimulation } from "@/hooks/useSimulation";
 import { Origin } from "@/components/simulation/Origin";
-import { BASE_SEPOLIA_CHAIN_ID, DEPLOYED, explorerTx } from "@/lib/protocol/config";
+import { BASE_SEPOLIA_CHAIN_ID, explorerTx } from "@/lib/protocol/config";
+import { useLiveProtocol } from "@/hooks/useLiveProtocol";
 import { DEMO_MODE } from "@/lib/demoMode";
 import { pipsToBp, pipsToPct, signed, usd } from "@/lib/format";
-import type { Scenario } from "@/lib/simulation/types";
+import type { ExecutedTx, Scenario } from "@/lib/simulation/types";
 
 /**
  * The simulation surface.
@@ -126,7 +127,7 @@ export function SimulationView() {
             </div>
           </div>
 
-          <FeeComparison scenario={scenario} />
+          <FeeComparison scenario={scenario} txs={txs} />
         </>
       )}
     </main>
@@ -146,6 +147,9 @@ function ScenarioPanel({
   onSize: (n: number) => void;
   disabled: boolean;
 }) {
+  // The hook's own base fee, not this build's copy of it. The quote beside it is priced against
+  // the live bounds, so reading the constant here would compare two different pools.
+  const { bounds } = useLiveProtocol();
   return (
     <section className="mb-5 overflow-hidden rounded-2xl border border-border-2 bg-surface">
       <header className="flex flex-wrap items-center justify-between gap-4 px-6 pb-4 pt-5">
@@ -196,7 +200,7 @@ function ScenarioPanel({
         <Metric
           label="Fee the hook will quote"
           value={pipsToPct(scenario.arbitrageLeg.feePips)}
-          note={`${pipsToBp(scenario.arbitrageLeg.feePips)} · base is ${pipsToBp(DEPLOYED.baseFeePips)}`}
+          note={`${pipsToBp(scenario.arbitrageLeg.feePips)} · base is ${pipsToBp(bounds.baseFeePips)}`}
           tone="accent"
         />
         <Metric
@@ -389,22 +393,47 @@ function PoolConvergence({ scenario }: { scenario: Scenario }) {
   );
 }
 
-function FeeComparison({ scenario }: { scenario: Scenario }) {
+/** The `feePips` the hook actually emitted for one leg, if that leg has run. */
+function emittedFeePips(tx: ExecutedTx | undefined): number | undefined {
+  const event = tx?.events.find((e) => e.name === "SwapAssayed");
+  if (!event) return undefined;
+  const raw = Number(event.args.feePips);
+  return Number.isFinite(raw) ? raw : undefined;
+}
+
+/**
+ * @param txs Receipts from the run, so this panel reports what the chain emitted rather than what
+ *        was projected. It previously took `scenario` alone while telling the reader both figures
+ *        "come out of a `SwapAssayed` event you can read on Basescan" -- true of the mechanism,
+ *        false of the numbers on screen, which were recomputed projections in every state.
+ */
+function FeeComparison({ scenario, txs }: { scenario: Scenario; txs: ExecutedTx[] }) {
+  const { bounds } = useLiveProtocol();
   const { economics, arbitrageLeg } = scenario;
   const ratio = economics.flatFeeToLpUsd > 0 ? economics.feeToLpUsd / economics.flatFeeToLpUsd : 0;
+
+  // Prefer what the chain emitted. `send` records the two legs under these labels in order, and
+  // each carries its decoded `SwapAssayed`; before a run there is nothing to prefer and the
+  // projection stands, labelled as one.
+  const arbitrageEmitted = emittedFeePips(txs.find((t) => t.label === "Arbitrage swap"));
+  const dislocationEmitted = emittedFeePips(txs.find((t) => t.label === "Dislocate the pool"));
+  const executed = arbitrageEmitted !== undefined && dislocationEmitted !== undefined;
+
+  const arbitrageFee = arbitrageEmitted ?? arbitrageLeg.feePips;
+  const dislocationFee = dislocationEmitted ?? scenario.dislocationLeg.feePips;
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border-2 bg-surface">
       <header className="flex flex-wrap items-center justify-between gap-3 px-6 pb-4 pt-5">
         <div>
           <p className="mb-2 font-mono text-[10.5px] font-medium uppercase leading-none tracking-[0.12em] text-text-muted">
-            What just happened
+            {executed ? "What just happened" : "What would happen"}
           </p>
           <p className="max-w-[64ch] text-[15px] font-medium leading-[1.45] text-text">
             The same trade, priced by Assay and by a flat-fee pool
           </p>
         </div>
-        <Origin origin="projected" />
+        <Origin origin={executed ? "live-testnet" : "projected"} />
       </header>
 
       <table className="w-full border-collapse border-t border-border text-left">
@@ -423,8 +452,8 @@ function FeeComparison({ scenario }: { scenario: Scenario }) {
         <tbody>
           <Row
             label="Fee quoted on the arbitrage"
-            flat={pipsToBp(DEPLOYED.baseFeePips)}
-            assay={pipsToBp(arbitrageLeg.feePips)}
+            flat={pipsToBp(bounds.baseFeePips)}
+            assay={pipsToBp(arbitrageFee)}
           />
           <Row
             label="Kept by liquidity providers"
@@ -448,9 +477,21 @@ function FeeComparison({ scenario }: { scenario: Scenario }) {
         <p className="max-w-[76ch] text-[12.5px] leading-[1.6] text-text-dim text-pretty">
           A flat-fee pool charges every swap the same rate, so it cannot tell this trade apart
           from the one that created the gap moments earlier. Assay prices the drift each swap
-          captures, so the arbitrage pays {pipsToBp(arbitrageLeg.feePips)} while the trade that
-          opened the gap paid {pipsToBp(scenario.dislocationLeg.feePips)} — and both figures come
-          out of a <span className="font-mono">SwapAssayed</span> event you can read on Basescan.
+          captures, so the arbitrage {executed ? "paid" : "would pay"} {pipsToBp(arbitrageFee)}{" "}
+          while the trade that opened the gap {executed ? "paid" : "would pay"}{" "}
+          {pipsToBp(dislocationFee)} —{" "}
+          {executed ? (
+            <>
+              and both figures are read from the{" "}
+              <span className="font-mono">SwapAssayed</span> events those two transactions
+              emitted, which you can check on Basescan.
+            </>
+          ) : (
+            <>
+              and both are what the hook will emit as a{" "}
+              <span className="font-mono">SwapAssayed</span> event when you run it.
+            </>
+          )}
         </p>
         {!DEMO_MODE && (
           <p className="mt-3 max-w-[76ch] rounded-[10px] border border-warm/20 bg-[#100E0A] px-4 py-3 text-[12px] leading-[1.6] text-[#9A8B72]">

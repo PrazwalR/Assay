@@ -182,13 +182,16 @@ export function buildScenario(
 
   // Two transactions: the swap itself, and its approval. The boundary path is the honest one —
   // the hook refreshes its oracle read on the first swap of a block, which a demo always is.
-  const gasUnits = GAS.blockBoundaryWithLiveFeed + 46_000;
+  const gasUnits = GAS.blockBoundaryWithLiveFeed + GAS.erc20Approve;
   const gasUsd = gasCostUsd(gasUnits, gasPriceWei, referenceUsd) ?? 0;
 
   // What the hook's surcharge actually routed to liquidity, and what a flat-fee pool would have
-  // taken from the same trade. This pair is the comparison the whole feature exists to make.
+  // taken from the same trade. This pair is the comparison the whole feature exists to make, so
+  // both halves have to come from the same place: `arbitrageLeg.feePips` is quoted against the
+  // live bounds, and the flat baseline used the compiled-in constant, which would silently
+  // become the wrong comparison the moment the deployed base fee differed from this build's.
   const feeToLpUsd = (proceedsUsd * arbitrageLeg.feePips) / 1_000_000;
-  const flatFeeToLpUsd = (proceedsUsd * DEPLOYED.baseFeePips) / 1_000_000;
+  const flatFeeToLpUsd = (proceedsUsd * bounds.baseFeePips) / 1_000_000;
 
   const economics: Economics = {
     costUsd,

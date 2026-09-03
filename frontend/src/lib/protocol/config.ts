@@ -104,6 +104,12 @@ export const GAS = {
   extremeDislocation: 28_617,
   extremeBudget: 55_000,
   chainlinkRead: 20_774,
+  /**
+   * An ERC-20 `approve` against a non-zero existing allowance, which is the shape the simulation
+   * sends. Not a hook measurement — it belongs here so every gas figure the app displays comes
+   * from one place, rather than one of them being a literal inside the arithmetic that uses it.
+   */
+  erc20Approve: 46_000,
 } as const;
 
 export const EXPLORER = "https://sepolia.basescan.org";
