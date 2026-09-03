@@ -1,6 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import { num, tokenAmount } from "./format";
+import { inputAmount, num, tokenAmount } from "./format";
+
+/**
+ * The bug this pins: flipping direction left the amount field alone, so the number was silently
+ * reinterpreted as the other token. "21" meaning 21 USDC became 21 WETH -- past the wallet's
+ * balance and the pool's whole depth -- so a one-click demonstration filled with
+ * insufficient-balance and exceeds-liquidity states. The flip now carries the quoted output into
+ * the field, which is what every DEX does.
+ */
+describe("inputAmount", () => {
+  it("emits no grouping separators, which parseUnits would reject", () => {
+    expect(inputAmount(1234.5, 6)).toBe("1234.5");
+    expect(num(1234.5, 2)).toBe("1,234.50"); // why the display formatter cannot be reused
+  });
+
+  it("strips trailing zeros so the field does not read as machine output", () => {
+    expect(inputAmount(0.00697, 18)).toBe("0.00697");
+    expect(inputAmount(21, 6)).toBe("21");
+  });
+
+  it("returns empty rather than a zero the user has to clear", () => {
+    expect(inputAmount(0, 18)).toBe("");
+    expect(inputAmount(Number.NaN, 18)).toBe("");
+  });
+});
 
 /**
  * The bug this pins: the swap page reported "0.00000 WETH in fees" for every ordinary swap.

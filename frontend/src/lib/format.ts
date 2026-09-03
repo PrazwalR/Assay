@@ -12,6 +12,19 @@ export const num = (value: number, decimals: number) =>
 export const usd = (value: number) => `$${num(value, 2)}`;
 
 /**
+ * A token amount destined for the amount *input*, not for display.
+ *
+ * Two differences from `num`, both of which break the field otherwise: no grouping separators,
+ * because `parseUnits("1,234.5")` throws; and trailing zeros stripped, because "0.00697000" is
+ * correct but reads as machine output in a box the user is about to type into.
+ */
+export const inputAmount = (value: number, decimals: number) => {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  const fixed = value.toFixed(decimals);
+  return fixed.includes(".") ? fixed.replace(/0+$/, "").replace(/\.$/, "") : fixed;
+};
+
+/**
  * A token amount that may be far smaller than its display precision.
  *
  * `num(value, displayDecimals)` is right for balances and outputs, where the token's own

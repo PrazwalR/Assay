@@ -9,7 +9,7 @@ import { useSwapExecution } from "@/hooks/useSwapExecution";
 import { useSwapQuote } from "@/hooks/useSwapQuote";
 import { PrimaryCta } from "@/components/swap/PrimaryCta";
 import { TxStatus } from "@/components/swap/TxStatus";
-import { num, pipsToPct, usd } from "@/lib/format";
+import { inputAmount, num, pipsToPct, usd } from "@/lib/format";
 import { GAS } from "@/lib/protocol/config";
 import { formatGasCostUsd, gasCostUsd } from "@/lib/protocol/gasCost";
 
@@ -150,7 +150,11 @@ export function SwapCard() {
         <div className="h-px flex-1 bg-border" />
         <button
           type="button"
-          onClick={flipDirection}
+          onClick={() =>
+            // Carry the quoted output into the input field, so the reversed pair keeps a
+            // quotable amount instead of reinterpreting the old number as the other token.
+            flipDirection(amount > 0 ? inputAmount(netOut, outToken.decimals) : undefined)
+          }
           aria-label="Reverse direction"
           className="flex size-[34px] items-center justify-center rounded-[11px] border border-border-2 bg-surface-5 font-mono text-sm leading-none text-text transition-[transform,background-color,border-color] duration-[280ms] ease-[cubic-bezier(.34,1.56,.64,1)] hover:rotate-180 hover:scale-[1.08] hover:border-accent hover:bg-accent hover:text-bg"
         >

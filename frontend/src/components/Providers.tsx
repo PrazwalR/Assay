@@ -38,7 +38,8 @@ interface AssayState {
   tokenOut: string;
   setTokenIn: (key: string) => void;
   setTokenOut: (key: string) => void;
-  flipDirection: () => void;
+  /** Pass the current output amount so it becomes the new input; omit to leave the field as is. */
+  flipDirection: (nextAmountIn?: string) => void;
 
   amountIn: string;
   setAmountIn: (value: string) => void;
@@ -137,12 +138,26 @@ function AssayProvider({ children }: { children: React.ReactNode }) {
     setDataMode((current) => (current === "testnet" ? "mainnet-mock" : "testnet"));
   }, []);
 
-  const flipDirection = useCallback(() => {
-    setTokenIn((currentIn) => {
-      setTokenOut(currentIn);
-      return tokenOut;
-    });
-  }, [tokenOut]);
+  /**
+   * Reverse the pair, carrying the quote across.
+   *
+   * `nextAmountIn` is the amount currently being quoted *out*, which becomes the amount going
+   * *in* after the flip -- the same thing every DEX does, and the only behaviour that leaves a
+   * sane quote on screen. Leaving the field alone reinterprets the number as the other token:
+   * "21" meaning 21 USDC becomes 21 WETH, which is four orders of magnitude past both the
+   * wallet's balance and the pool's depth, so the panel fills with insufficient-balance and
+   * exceeds-liquidity states on what is otherwise a one-click demonstration.
+   */
+  const flipDirection = useCallback(
+    (nextAmountIn?: string) => {
+      setTokenIn((currentIn) => {
+        setTokenOut(currentIn);
+        return tokenOut;
+      });
+      if (nextAmountIn !== undefined) setAmountIn(nextAmountIn);
+    },
+    [tokenOut],
+  );
 
   const value = useMemo<AssayState>(() => {
     const feePips = quote(drift, referenceFresh, DEPLOYED);
