@@ -100,10 +100,10 @@ export function EventLog() {
       <p className="mt-3 border-t border-border pt-3 text-[11.5px] leading-[1.55] text-text-muted">
         These are the real event signatures from{" "}
         <span className="font-mono">IAssayEvents.sol</span>, populated with the quote above —
-        a preview of what this swap would emit, not a log fetched from the chain. The pool has
-        emitted two real <span className="font-mono">SwapAssayed</span> events so far, at 500
-        and 3,070 pips. <span className="font-mono">sender</span> is the router, never the
-        trader.
+        a preview of what this swap would emit, not a log fetched from the chain. Every{" "}
+        <span className="font-mono">SwapAssayed</span> event the pool has actually emitted is
+        read from the chain and listed on the markets page.{" "}
+        <span className="font-mono">sender</span> is the router, never the trader.
       </p>
     </section>
   );
