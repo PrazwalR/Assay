@@ -31,10 +31,9 @@ library ToxicitySurcharge {
         int128 raw = specifiedIsToken0 ? delta.amount1() : delta.amount0();
 
         unchecked {
-            // Two's-complement negation: unary minus on type(int128).min overflows, and this
-            // runs on the swap path where a revert is unacceptable. `magnitude` mirrors
-            // Both branches
-            // reinterpret the full 128-bit word and neither truncates.
+            // Two's-complement negation rather than unary minus: `-raw` overflows on
+            // type(int128).min, and this runs on the swap path where a revert is unacceptable.
+            // Both branches reinterpret the full 128-bit word, so neither truncates.
             // forge-lint: disable-next-line(unsafe-typecast)
             magnitude = raw < 0 ? uint256(uint128(~raw)) + 1 : uint256(uint128(raw));
         }
@@ -47,15 +46,15 @@ library ToxicitySurcharge {
     ///      `FullMath.mulDiv` carries a 512-bit
     ///      intermediate, so this cannot overflow regardless of `notional`.
     function surchargeAmount(uint256 notional, uint24 overflowPips) internal pure returns (uint256 amount) {
-        // The denominator is FeeBlend's own overflow ceiling, imported rather than repeated.
-        // The guarantee that the surcharge never exceeds `notional` -- which is what makes
-        // the int128 cast at the call site exact -- holds only while these two are equal, and
+        // `overflowPips` is bounded by FeeBlend.MAX_OVERFLOW_PIPS (20,000) against a
+        // PIPS_DENOMINATOR of 1,000,000, so the surcharge is at most 2% of `notional`. That is
+        // what keeps the int128 cast at the call site exact. Both constants are imported from
+        // FeeBlend rather than restated, because the bound is a relationship between them and
         // two matching literals in two files is not a guarantee.
         //
-        // Rounded up: this is a fee, and a fee that rounds down leaks value to the swapper on
-        // every swap that reaches this path. The bound still holds, because rounding up a
-        // quotient whose exact value is at most `notional` cannot exceed `notional` unless
-        // the division was already exact, in which case there is nothing to round.
+        // Rounded up: this is a fee, and one that rounds down leaks value to the swapper on
+        // every swap reaching this path. Rounding up cannot break the 2% bound -- it adds at
+        // most one unit to a quotient already far below `notional`.
         return FullMath.mulDivRoundingUp(notional, overflowPips, FeeBlend.PIPS_DENOMINATOR);
     }
 }

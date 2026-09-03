@@ -92,12 +92,22 @@ contract SeedActivity is Script {
 
         // Seven swaps, alternating. The first is currency0-in, which is the direction that
         // trades toward a reference sitting below the pool -- the priced side.
+        //
+        // Each amount is env-sourced (ASSAY_SWAP_AMOUNT0/1, set by the operator), far inside
+        // int256 -- the same shape of cast the fork test suppresses the same way.
+        // forge-lint: disable-next-line(unsafe-typecast)
         _swap(swapRouter, key, true, int256(swapAmount0));
+        // forge-lint: disable-next-line(unsafe-typecast)
         _swap(swapRouter, key, false, int256(swapAmount1));
+        // forge-lint: disable-next-line(unsafe-typecast)
         _swap(swapRouter, key, true, int256(swapAmount0 * 3 / 2));
+        // forge-lint: disable-next-line(unsafe-typecast)
         _swap(swapRouter, key, false, int256(swapAmount1 * 3 / 2));
+        // forge-lint: disable-next-line(unsafe-typecast)
         _swap(swapRouter, key, true, int256(swapAmount0 / 2));
+        // forge-lint: disable-next-line(unsafe-typecast)
         _swap(swapRouter, key, false, int256(swapAmount1 / 2));
+        // forge-lint: disable-next-line(unsafe-typecast)
         _swap(swapRouter, key, true, int256(swapAmount0));
 
         vm.stopBroadcast();
