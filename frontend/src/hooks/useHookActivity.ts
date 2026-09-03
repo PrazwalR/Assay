@@ -1,10 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { usePublicClient } from "wagmi";
+import { useEffect, useMemo, useState } from "react";
+import { createPublicClient, http } from "viem";
+import { baseSepolia } from "viem/chains";
 
-import { BASE_SEPOLIA_CHAIN_ID, CONTRACTS, HOOK_DEPLOY_BLOCK, POOL } from "@/lib/protocol/config";
+import { CONTRACTS, HOOK_DEPLOY_BLOCK, POOL } from "@/lib/protocol/config";
 import { ASSAY_EVENT_ABI } from "@/lib/protocol/events";
+
+/**
+ * Log scanning uses its own endpoint, not the app-wide one.
+ *
+ * A wide `eth_getLogs` and a point read are different products as far as an RPC provider is
+ * concerned. `NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL` is set on the deployment to an Alchemy key,
+ * which is the better endpoint for the `eth_call` reads the rest of the app makes -- and whose
+ * free tier caps `eth_getLogs` at a **10 block range**, rejecting every chunk here with
+ * `-32600`. That is why the activity feed worked on localhost, which falls back to the public
+ * endpoint, and failed on the deployment.
+ *
+ * Base's public endpoint answers a 9,999-block range, so the scan is pinned to it and only
+ * overridden by a variable set specifically for logs. Scanning 100,000 blocks ten at a time is
+ * not a fallback worth writing -- it is 10,000 requests.
+ */
+const LOGS_RPC_URL = process.env.NEXT_PUBLIC_LOGS_RPC_URL ?? "https://sepolia.base.org";
 
 /**
  * Every swap this hook has ever priced, read from its own `SwapAssayed` logs.
@@ -66,7 +83,10 @@ export interface HookActivity {
 }
 
 export function useHookActivity(minFeePips: number): HookActivity {
-  const client = usePublicClient({ chainId: BASE_SEPOLIA_CHAIN_ID });
+  const client = useMemo(
+    () => createPublicClient({ chain: baseSepolia, transport: http(LOGS_RPC_URL) }),
+    [],
+  );
   const [state, setState] = useState<HookActivity>({
     swaps: [],
     isLoading: true,
@@ -93,6 +113,7 @@ export function useHookActivity(minFeePips: number): HookActivity {
         const collected: AssayedSwap[] = [];
         let chunks = 0;
         let truncated = false;
+        let failed = 0;
         for (let start = from; start <= latest; start += CHUNK) {
           if (chunks >= MAX_CHUNKS) {
             truncated = true;
@@ -100,13 +121,25 @@ export function useHookActivity(minFeePips: number): HookActivity {
           }
           chunks += 1;
           const end = start + CHUNK - 1n > latest ? latest : start + CHUNK - 1n;
-          const logs = await client.getLogs({
-            address: CONTRACTS.hook,
-            event,
-            args: { poolId: POOL.id },
-            fromBlock: start,
-            toBlock: end,
-          });
+
+          // One bad window must not discard the windows that worked. A rate limit or a
+          // provider-specific range rule can reject a single chunk, and losing every real swap
+          // over it -- which is what the whole-scan try/catch used to do -- turns a partial
+          // answer into "Could not read the hook's logs."
+          let logs;
+          try {
+            logs = await client.getLogs({
+              address: CONTRACTS.hook,
+              event,
+              args: { poolId: POOL.id },
+              fromBlock: start,
+              toBlock: end,
+            });
+          } catch {
+            failed += 1;
+            truncated = true;
+            continue;
+          }
 
           for (const log of logs) {
             const feePips = Number(log.args.feePips ?? 0);
@@ -130,7 +163,15 @@ export function useHookActivity(minFeePips: number): HookActivity {
             ? b.logIndex - a.logIndex
             : Number(b.blockNumber - a.blockNumber),
         );
-        setState({ swaps: collected, isLoading: false, error: undefined, truncated });
+        // Only a scan that returned nothing at all is an error. A partial one is a result, and
+        // says so through `truncated`.
+        const total = chunks - failed;
+        setState({
+          swaps: collected,
+          isLoading: false,
+          error: total === 0 ? "every log request was rejected" : undefined,
+          truncated,
+        });
       } catch (caught) {
         if (cancelled) return;
         setState({

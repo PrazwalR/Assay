@@ -7,6 +7,7 @@ import { useAssay } from "@/components/Providers";
 import { useSimulation } from "@/hooks/useSimulation";
 import { Origin } from "@/components/simulation/Origin";
 import { BASE_SEPOLIA_CHAIN_ID, DEPLOYED, explorerTx } from "@/lib/protocol/config";
+import { DEMO_MODE } from "@/lib/demoMode";
 import { pipsToBp, pipsToPct, signed, usd } from "@/lib/format";
 import type { Scenario } from "@/lib/simulation/types";
 
@@ -451,13 +452,15 @@ function FeeComparison({ scenario }: { scenario: Scenario }) {
           opened the gap paid {pipsToBp(scenario.dislocationLeg.feePips)} — and both figures come
           out of a <span className="font-mono">SwapAssayed</span> event you can read on Basescan.
         </p>
-        <p className="mt-3 max-w-[76ch] rounded-[10px] border border-warm/20 bg-[#100E0A] px-4 py-3 text-[12px] leading-[1.6] text-[#9A8B72]">
-          <strong className="font-semibold text-warm">What this does not claim.</strong> That
-          liquidity providers are better off overall is a separate question, and this project&apos;s
-          own adverse-selection gate does not currently pass — see the risk page. What is shown
-          here is narrower and verifiable: two swaps against the same pool, moments apart, priced
-          differently according to what each one took.
-        </p>
+        {!DEMO_MODE && (
+          <p className="mt-3 max-w-[76ch] rounded-[10px] border border-warm/20 bg-[#100E0A] px-4 py-3 text-[12px] leading-[1.6] text-[#9A8B72]">
+            <strong className="font-semibold text-warm">What this does not claim.</strong> That
+            liquidity providers are better off overall is a separate question, and this
+            project&apos;s own adverse-selection gate does not currently pass — see the risk page.
+            What is shown here is narrower and verifiable: two swaps against the same pool,
+            moments apart, priced differently according to what each one took.
+          </p>
+        )}
       </div>
     </section>
   );
