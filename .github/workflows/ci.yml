@@ -54,7 +54,7 @@ jobs:
       # exclusion actually works.
       - name: Coverage
         run: |
-          forge coverage --report lcov --report-file lcov.info             --no-match-coverage "(script|test)" --no-match-contract "HookOverheadTest|LiveBaseSepoliaForkTest"
+          forge coverage --report lcov --report-file lcov.info             --no-match-coverage "(script|test)" --no-match-contract "HookOverheadTest|LiveBaseSepoliaForkTest|SimulationSizesForkTest"
           python3 - <<'CHECK'
           import re, sys
           hit = found = 0

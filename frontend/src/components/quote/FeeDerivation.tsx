@@ -22,10 +22,17 @@ const pct = (drift: number) =>
  * the only honest way to present a fee that changes per swap.
  */
 export function FeeDerivation() {
-  const { setDrift, tone } = useAssay();
+  const { setDrift } = useAssay();
   // The live drift, not the demonstration walk. This panel sits beside the swap card and used
   // to contradict it — showing 100-3,700 pips next to the card's 790.
-  const { drift, feePips, feePaidOut, outToken, driftIsLive, referenceFresh } = useSwapQuote();
+  //
+  // `tone` comes from here too, for the same reason. It used to be destructured from
+  // `useAssay()` -- the `Math.random()` walk -- while every number in the panel came from this
+  // hook, so the colour of the drift figure, the meter and two derivation rows was driven by the
+  // simulated walk and re-tinted every 2.2s while the numbers themselves sat still. A live floor
+  // quote could render in the colour of a capturing one.
+  const { drift, feePips, feePaidOut, outToken, driftIsLive, referenceFresh, tone } =
+    useSwapQuote();
   // The rows must add up to the result. Using DEPLOYED here while the result row used
   // the live bounds meant they would silently disagree the moment the two diverged.
   const { bounds } = useLiveProtocol();

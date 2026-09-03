@@ -175,6 +175,17 @@ export function useSimulation(input: ScenarioInput) {
     [writeContractAsync, config],
   );
 
+  /** WETH the connected wallet holds right now, so leg two can be sized from what leg one paid. */
+  const wethBalance = useCallback(async (): Promise<bigint> => {
+    if (!publicClient || !address) return 0n;
+    return (await publicClient.readContract({
+      address: POOL.currency1,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [address],
+    })) as bigint;
+  }, [publicClient, address]);
+
   /** Grants the router an allowance if it does not already have enough. */
   const ensureAllowance = useCallback(
     async (token: `0x${string}`, amount: bigint, label: string) => {
@@ -249,16 +260,25 @@ export function useSimulation(input: ScenarioInput) {
         scenario.dislocationLeg.amountIn,
         "Approve USDC",
       );
+      const wethBefore = await wethBalance();
       await send("Dislocate the pool", swapRequest(true, scenario.dislocationLeg.amountIn));
       advance("dislocate");
 
       setActiveStage("calculate");
+
+      // Size leg two from the WETH leg one *actually* produced, not from the amount the local
+      // curve predicted it would. The prediction is made against a snapshot read before leg one
+      // executes, and the pool moves in between -- other traders, a reference refresh, or simply
+      // the difference between this port of the swap math and v4's own. Spending a predicted
+      // amount the wallet may not hold is how a two-leg run fails at one size and not another.
+      const produced = (await wethBalance()) - wethBefore;
+      const arbitrageIn = produced > 0n ? produced : scenario.arbitrageLeg.amountIn;
       advance("calculate");
 
       // --- Leg 2: the arbitrage ----------------------------------------------------------
       setActiveStage("submit");
-      await ensureAllowance(POOL.currency1, scenario.arbitrageLeg.amountIn, "Approve WETH");
-      await send("Arbitrage swap", swapRequest(false, scenario.arbitrageLeg.amountIn));
+      await ensureAllowance(POOL.currency1, arbitrageIn, "Approve WETH");
+      await send("Arbitrage swap", swapRequest(false, arbitrageIn));
       advance("submit");
 
       setActiveStage("confirm");
@@ -279,7 +299,7 @@ export function useSimulation(input: ScenarioInput) {
       );
       setStatus("failed");
     }
-  }, [scenario, ensureAllowance, send, swapRequest]);
+  }, [scenario, ensureAllowance, send, swapRequest, wethBalance]);
 
   const reset = useCallback(() => {
     setStatus("idle");

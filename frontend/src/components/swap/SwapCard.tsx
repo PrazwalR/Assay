@@ -229,7 +229,10 @@ export function SwapCard() {
             {(priceImpact * 100).toFixed(2)}%
           </span>
         </DetailRow>
-        <DetailRow label="Hook gas">
+        {/* Named for the path it measures. The figure is the block-boundary one, which this
+            swap almost certainly is on a pool traded this rarely -- but "Hook gas" alone reads
+            as measured for this specific swap, which it is not. */}
+        <DetailRow label="Hook gas, first swap of a block">
           {hookGas.toLocaleString("en-US")}
           <span className="ml-2 text-text-muted">{formatGasCostUsd(hookGasUsd)}</span>
         </DetailRow>
@@ -258,8 +261,8 @@ export function SwapCard() {
           </p>
           <p className="text-[12.5px] leading-[1.5] text-[#9A8480]">
             This trade would exhaust the seeded liquidity range, so the output above is an upper
-            bound the pool cannot actually pay. The pool holds roughly 38 USDC of depth. Reduce
-            the amount.
+            bound the pool cannot actually pay. Reduce the amount — this pool holds only tens of
+            dollars of depth, and the markets page carries the live figure.
           </p>
         </div>
       ) : null}
