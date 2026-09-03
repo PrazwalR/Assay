@@ -28,8 +28,21 @@ import { ASSAY_EVENT_ABI } from "@/lib/protocol/events";
  */
 const CHUNK = 9_999n;
 
-/** How far back to look, in chunks. Three covers roughly a day of Base blocks. */
-const MAX_CHUNKS = 3;
+/**
+ * Ceiling on how many `eth_getLogs` round-trips one scan may cost.
+ *
+ * The scan starts at `HOOK_DEPLOY_BLOCK` rather than a rolling window back from head, because
+ * a rolling window silently drops the pool's earliest swaps -- which is most of them, since
+ * this pool is traded in bursts rather than continuously. An earlier revision looked back
+ * three chunks and, once the chain had advanced ~80,000 blocks past deployment, showed 2 of
+ * the 14 swaps on chain while the header still counted only what it had found.
+ *
+ * Base produces ~43,200 blocks a day, so this budget covers roughly nine days past deployment
+ * before it binds. When it does bind the scan reports `truncated`, and the UI says so, rather
+ * than presenting a partial history as a complete one. The real fix past that point is an
+ * indexer, not a larger number here.
+ */
+const MAX_CHUNKS = 40;
 
 export interface AssayedSwap {
   txHash: `0x${string}`;
@@ -45,6 +58,11 @@ export interface HookActivity {
   swaps: AssayedSwap[];
   isLoading: boolean;
   error: string | undefined;
+  /**
+   * True when the scan hit `MAX_CHUNKS` before reaching the head, so `swaps` is the tail of the
+   * hook's history rather than all of it. Surfaced so the UI can stop calling it complete.
+   */
+  truncated: boolean;
 }
 
 export function useHookActivity(minFeePips: number): HookActivity {
@@ -53,6 +71,7 @@ export function useHookActivity(minFeePips: number): HookActivity {
     swaps: [],
     isLoading: true,
     error: undefined,
+    truncated: false,
   });
 
   useEffect(() => {
@@ -63,17 +82,23 @@ export function useHookActivity(minFeePips: number): HookActivity {
       try {
         const latest = await client.getBlockNumber();
 
-        // Never scan below the hook's own deployment: there is nothing there, and the span
-        // would grow without bound as the chain advances.
-        const floor =
-          latest > CHUNK * BigInt(MAX_CHUNKS) ? latest - CHUNK * BigInt(MAX_CHUNKS) : 0n;
-        const from = floor > HOOK_DEPLOY_BLOCK ? floor : HOOK_DEPLOY_BLOCK;
+        // Start at deployment, not at a rolling offset from head: everything before the hook
+        // existed is empty by construction, and anchoring to head is what previously hid the
+        // pool's earliest swaps. `MAX_CHUNKS` bounds the cost instead.
+        const from = HOOK_DEPLOY_BLOCK;
 
         const event = ASSAY_EVENT_ABI.find((e) => e.name === "SwapAssayed");
         if (!event) throw new Error("SwapAssayed missing from the event ABI");
 
         const collected: AssayedSwap[] = [];
+        let chunks = 0;
+        let truncated = false;
         for (let start = from; start <= latest; start += CHUNK) {
+          if (chunks >= MAX_CHUNKS) {
+            truncated = true;
+            break;
+          }
+          chunks += 1;
           const end = start + CHUNK - 1n > latest ? latest : start + CHUNK - 1n;
           const logs = await client.getLogs({
             address: CONTRACTS.hook,
@@ -105,13 +130,14 @@ export function useHookActivity(minFeePips: number): HookActivity {
             ? b.logIndex - a.logIndex
             : Number(b.blockNumber - a.blockNumber),
         );
-        setState({ swaps: collected, isLoading: false, error: undefined });
+        setState({ swaps: collected, isLoading: false, error: undefined, truncated });
       } catch (caught) {
         if (cancelled) return;
         setState({
           swaps: [],
           isLoading: false,
           error: caught instanceof Error ? caught.message.split("\n")[0] : String(caught),
+          truncated: false,
         });
       }
     })();

@@ -17,7 +17,7 @@ const SHOWN = 8;
  * trader, so a column for it would be identical noise repeated N times.
  */
 export function ActivityFeed() {
-  const { swaps, isLoading, error } = useHookActivity(DEPLOYED.minFeePips);
+  const { swaps, isLoading, error, truncated } = useHookActivity(DEPLOYED.minFeePips);
   const shown = swaps.slice(0, SHOWN);
 
   return (
@@ -25,7 +25,7 @@ export function ActivityFeed() {
       <header className="flex items-baseline justify-between gap-3 border-b border-border-2 px-5 py-[14px]">
         <h2 className="text-[14px] font-semibold leading-none">Recent swaps</h2>
         <span className="font-mono text-[11.5px] leading-none text-text-muted">
-          {isLoading ? "reading chain…" : `${swaps.length} priced`}
+          {isLoading ? "reading chain…" : `${swaps.length} priced${truncated ? "+" : ""}`}
         </span>
       </header>
 
@@ -65,7 +65,7 @@ export function ActivityFeed() {
       )}
 
       <p className="border-t border-border-2 px-5 py-[11px] text-[12px] leading-none text-text-muted">
-        Live, not fixtures.{" "}
+        {truncated ? "Live, not fixtures — most recent only." : "Live, not fixtures."}{" "}
         <Link href="/docs/mechanism" className="underline underline-offset-2">
           How the fee is set
         </Link>
