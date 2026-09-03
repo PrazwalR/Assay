@@ -12,6 +12,38 @@ Open a private security advisory on the repository rather than a public issue. I
 affected file and line, the conditions required to reach the code, and the impact. A proof
 of concept as a Foundry test is the most useful form.
 
+## Open findings
+
+**H-2 — a JIT liquidity provider can manufacture drift and collect the surcharge.** A
+provider who orders their own swap immediately ahead of a pending one can manufacture
+apparent drift for that swap and collect the inflated toxicity surcharge as the dominant
+in-range liquidity provider. The reference-deviation cap (see below) gates which Chainlink
+readings are *adopted*; it does not bound the live `lastTick` the fee formula actually
+consumes, and `Mispricing.MAX_MISPRICING_TICKS` (200,000) is ten times looser than the
+deviation cap (20,000).
+
+Filed as a High-severity finding in the 8-checklist audit pass (`audits/Assay-2026-08-31/`).
+Five of the six findings from that pass are fixed, each with a regression test in
+`test/integration/AuditFixes.t.sol` — this is the one that is not. See `README.md#history` for
+the other five and how they were fixed.
+
+`test/exploit/JitLiquidityDriftManufacture.t.sol` demonstrates it end to end against an
+unmodified hook. Holding 99% of in-range liquidity, an attacker pushes the pool's own tick to
+−4,200 while the reference stays at 0. Their manipulation swap is quoted at the **base rate**,
+not the floor — it is priced from the pre-swap tick, which still agreed with the reference, so
+the drift it manufactures is invisible to its own quote. An identical 0.001 ETH swap by an
+unrelated party then pays **10,000 pips (the ceiling) plus a surcharge**, against 500 pips and
+no surcharge for the same swap on the same pool in the control run. Roughly 99% of both flows
+back to the attacker as the dominant liquidity provider.
+
+Two things that test does **not** establish, stated so the severity is not overread: it does
+not measure the attacker's net profit, and the manipulation is not free — moving the tick that
+far costs real price impact, which is only partly recovered on exit. Whether the attack clears
+its own cost depends on the victim's size relative to the manipulation, and that has not been
+measured. What is established is that the mechanism works and the extraction is from a third
+party, unlike the self-dealing case analysed above, which nets to zero. Treat this as a real
+finding of unquantified profitability, not a proven-profitable exploit.
+
 ## Threat model
 
 The hook quotes a fee and takes a surcharge on extreme dislocation. It holds no custody of
@@ -171,6 +203,13 @@ the safe direction and is not a position anyone profits from.
   0.75 earlier revisions of this file claimed. The mechanism is correct; the evidence that it
   improves liquidity-provider outcomes is not yet established. Full writeup at the Risk page
   above.
+- **`script/SeedActivity.s.sol` swaps without slippage protection.** Its `_swap` helper passes
+  `TickMath.MIN_SQRT_PRICE`/`MAX_SQRT_PRICE` as the price limit, so the operator's own swaps
+  are bounded by pool liquidity rather than by a price they chose. On a public testnet mempool
+  a sandwiching bot could worsen the fill. This is an operator tool that moves testnet funds
+  only, and the amounts come from the environment rather than being computed, so a bad fill
+  costs test tokens and nothing else. Recorded rather than fixed because a price limit picked
+  by the script would need recalibrating every time the pool's depth changes.
 - **No independent adversarial review has been completed.** Reentrancy through `donate`, and
   cross-swap fee manipulation via the tick recorded in `afterSwap`, have been reasoned about
   and partially mutation-tested but not audited by a third party.
