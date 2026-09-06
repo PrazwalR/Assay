@@ -6,6 +6,7 @@ import { useAccount, useBalance, useConnect, useDisconnect } from "wagmi";
 import { useAssay } from "@/components/Providers";
 import { BASE_SEPOLIA_CHAIN_ID, explorerAddress, shortAddress } from "@/lib/protocol/config";
 import { formatBalance } from "@/lib/format";
+import { track } from "@vercel/analytics";
 
 export function WalletModal() {
   const { closeModal } = useAssay();
@@ -35,7 +36,12 @@ export function WalletModal() {
               <button
                 type="button"
                 disabled={isPending}
-                onClick={() => connect({ connector })}
+                onClick={() => {
+                  // Which connector, never which wallet. The address is deliberately absent:
+                  // it is an on-chain identity and does not belong in an analytics product.
+                  track("wallet_connect_started", { connector: connector.name });
+                  connect({ connector });
+                }}
                 className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-border bg-surface-3 p-[13px] text-left transition-colors hover:border-border-hover hover:bg-surface-4 disabled:opacity-60"
               >
                 <span className="flex size-[30px] items-center justify-center rounded-lg bg-[#C3C8D4] font-mono text-[11px] font-semibold leading-none text-bg">

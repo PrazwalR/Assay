@@ -18,6 +18,7 @@ import {
   ROUTERS,
 } from "@/lib/protocol/config";
 import { TOKENS, isZeroForOne, priceLimitFor } from "@/lib/protocol/tokens";
+import { track } from "@vercel/analytics";
 
 /**
  * Executing a swap, as an explicit state machine.
@@ -175,6 +176,9 @@ export function useSwapExecution(params: {
     // Refuse rather than fall back to an unbounded swap. A trade with no price bound on a pool
     // this shallow can fill arbitrarily badly and cannot revert.
     if (priceLimit === undefined) return;
+    // Direction only. Never the address, never the amount in a form that could fingerprint a
+    // wallet -- this records that a swap was attempted and which way, nothing about who.
+    track("swap_submitted", { direction: zeroForOne ? "usdc_to_weth" : "weth_to_usdc" });
     setIntent("swap");
     writeContract({
       address: ROUTERS.swap,

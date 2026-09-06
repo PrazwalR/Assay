@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Archivo, JetBrains_Mono } from "next/font/google";
 
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+
 import { AppShell } from "@/components/shell/AppShell";
 import { Providers } from "@/components/Providers";
 
@@ -46,6 +49,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>
+        {/*
+          Page views and Core Web Vitals only. Both are cookieless, which is why there is no
+          consent banner: nothing here stores an identifier on the visitor's machine.
+
+          Nothing that identifies a *person* is ever sent. In particular the connected wallet
+          address is never an event property -- it is an on-chain identity, and joining it to a
+          browsing session inside a third-party analytics product is exactly the thing this
+          project spends its docs telling people it does not do. Custom events describe what
+          happened, never who did it.
+        */}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

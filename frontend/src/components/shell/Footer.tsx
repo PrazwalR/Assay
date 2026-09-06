@@ -19,6 +19,13 @@ export function Footer() {
             A Uniswap v4 hook that prices adverse selection per swap. Research software: it has
             never held value and has not been independently audited.
           </p>
+          {/* Stated rather than buried. The whole project argues that what you are not told is
+              as important as what you are; silently adding measurement would undercut that. */}
+          <p className="mt-3 text-[11.5px] leading-[1.55] text-text-muted">
+            This site counts page views and records four interactions — connecting a wallet,
+            flipping direction, submitting a swap, running the simulation — with no cookies and
+            no identifier stored on your machine. Your wallet address is never sent.
+          </p>
         </div>
 
         <div>

@@ -25,6 +25,7 @@ import type { ExecutedTx, Scenario, ScenarioInput, Stage, StageId } from "@/lib/
 import { usePoolCurve } from "@/hooks/usePoolCurve";
 import { useLivePool } from "@/hooks/useLivePool";
 import { useLiveProtocol } from "@/hooks/useLiveProtocol";
+import { track } from "@vercel/analytics";
 
 /**
  * Runs the simulation.
@@ -244,6 +245,9 @@ export function useSimulation(input: ScenarioInput) {
 
   const run = useCallback(async () => {
     if (!scenario || scenario.unavailable) return;
+    // The dislocation size is a value the user picked from three buttons, not anything derived
+    // from their wallet. Knowing which size people actually run is the point of the event.
+    track("simulation_run", { dislocationUsdc: scenario.input.dislocationUsdc });
     setStatus("running");
     setError(undefined);
     setTxs([]);
