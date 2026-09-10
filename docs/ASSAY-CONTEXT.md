@@ -91,8 +91,10 @@ Invariants **1, 2, 4, 5, 8, 9** are live and are the ones that matter.
 - **No pool allowlist in `beforeInitialize`.** §4 constraint 6 describes one. What exists
   instead is a currency-pair binding: the hook refuses any pool whose currencies do not match
   the pair its oracle declares.
-- **The adverse-selection gate does not pass.** AUC 0.7485 against a 0.75 floor, 91 positive
-  examples against a floor of 100, weakest walk-forward fold 0.469 against a floor of 0.60. See
+- **The adverse-selection gate does not pass.** It fails on two of five criteria: 91 positive
+  examples against a floor of 100, and the weakest walk-forward fold at 0.469 against a floor of
+  0.60. The AUC of 0.7485 **clears** its own floor, which is 0.65 (`ASSAY_GATE_MIN_AUC` in
+  `calibration/assay_calib/config.py`) and not the 0.75 an earlier revision of this file claimed. See
   the Risk page in the app's docs (`frontend/src/components/docs/pages.tsx`, the `Risk`
   component; served at `/docs/risk`). The mechanism is implemented and deployed; the evidence
   that it improves LP outcomes is not established.
