@@ -14,13 +14,6 @@ library Q32x32 {
     function blendSigned(int64 previous, int64 sample, uint64 lambda) internal pure returns (int64) {
         unchecked {
             int256 weighted = int256(uint256(lambda)) * previous + int256(uint256(ONE - lambda)) * sample;
-            // Division, not an arithmetic shift. `>> 32` floors toward negative infinity,
-            // which makes a sell's contribution one unit larger in magnitude than an equal
-            // buy's and biases the imbalance estimate downward over time. Signed division
-            // truncates toward zero, so equal and opposite flow cancels exactly.
-            // Convexity still holds: truncating toward zero moves the result no further than
-            // the nearest integer, and both bounds are themselves integers.
-            // forge-lint: disable-next-line(unsafe-typecast)
             return int64(weighted / int256(uint256(ONE)));
         }
     }
