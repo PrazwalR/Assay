@@ -218,6 +218,27 @@ def univariate_auc(df: pd.DataFrame, cfg: CalibrationConfig, label_column: str) 
     return scores
 
 
+def auc_standard_error(auc: float, n_pos: int, n_neg: int) -> float:
+    """
+    Hanley-McNeil standard error of an AUC estimate.
+
+    A fold's AUC is meaningless without the count behind it. At 50 positives the standard
+    error is about 0.04, so a fold at 0.47 against a 0.75 model is a six-sigma event and
+    points at genuine regime reversal. At 8 positives the same figure is 0.10, the same fold
+    is under three sigma, and the diagnosis is simply that the slice was starved. The two
+    imply opposite actions -- fetch more data, or stop and report a real finding -- so the
+    error bar is what separates them.
+    """
+    if n_pos < 1 or n_neg < 1:
+        return float("nan")
+    q1 = auc / (2.0 - auc)
+    q2 = 2.0 * auc * auc / (1.0 + auc)
+    var = (auc * (1.0 - auc) + (n_pos - 1) * (q1 - auc * auc) + (n_neg - 1) * (q2 - auc * auc)) / (
+        n_pos * n_neg
+    )
+    return float(np.sqrt(var)) if var > 0 else 0.0
+
+
 def walk_forward_auc(df: pd.DataFrame, cfg: CalibrationConfig, label_column: str) -> list[float]:
     """
     AUC across consecutive time folds, each trained only on data preceding it.
@@ -255,9 +276,19 @@ def walk_forward_auc(df: pd.DataFrame, cfg: CalibrationConfig, label_column: str
         model = LogisticRegression(
             class_weight="balanced", max_iter=cfg.gate.max_iter, random_state=cfg.gate.random_seed
         ).fit(scaler.transform(x_train), y_train)
-        scores.append(
-            float(roc_auc_score(y_test, model.predict_proba(scaler.transform(x_test))[:, 1]))
+        fold_auc = float(roc_auc_score(y_test, model.predict_proba(scaler.transform(x_test))[:, 1]))
+        n_pos = int(y_test.sum())
+        n_neg = int(len(y_test) - n_pos)
+        log.info(
+            "fold %d: auc %.4f +/- %.4f  (%d pos / %d neg of %d test rows)",
+            i,
+            fold_auc,
+            auc_standard_error(fold_auc, n_pos, n_neg),
+            n_pos,
+            n_neg,
+            len(y_test),
         )
+        scores.append(fold_auc)
     return scores
 
 
