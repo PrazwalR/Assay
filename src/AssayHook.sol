@@ -27,10 +27,7 @@ import {PoolState} from "./types/PoolState.sol";
 
 /// @title AssayHook
 /// @notice A Uniswap v4 hook that prices adverse selection per swap rather than per pool.
-/// @dev The fee is set from the drift a swap captures against a cached reference price.
-///      Every formula lives in a pure library; this contract reads state, delegates, writes
-///      state and returns values, which is what makes the math fuzzable without a
-///      PoolManager.
+/// @dev Every formula lives in a pure library, so the math is fuzzable without a PoolManager.
 contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     using LPFeeLibrary for uint24;
     using StateLibrary for IPoolManager;
@@ -43,9 +40,8 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     uint24 private immutable MAX_REFERENCE_DEVIATION_TICKS;
     uint64 private immutable TWAP_LAMBDA_X32;
 
-    /// @dev Without a ceiling, an oracle that burns gas rather than reverting takes 63/64 of
-    ///      whatever the swapper supplied and starves the rest of the swap. Honest read is
-    ///      ~21,000 gas.
+    /// @dev Stops an oracle burning gas instead of reverting from taking 63/64 of the
+    ///      swapper's. An honest read is ~21,000.
     uint256 private constant ORACLE_READ_GAS_LIMIT = 150_000;
 
     /// @dev Seconds per block above which the chain is treated as halted rather than quiet.
@@ -55,17 +51,14 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     /// @dev Absolute slack on the halt test, so a single late block is never a halt.
     uint256 private constant HALT_GRACE_SECONDS = 90;
 
-    /// @dev A halt freezes the pool tick and the feed's `updatedAt` together, so on
-    ///      resumption they still agree with each other while both disagree with the world.
-    ///      This window holds the quote at the ceiling until the feed can post a reading
-    ///      from after the halt.
+    /// @dev A halt freezes the pool tick and the feed's `updatedAt` together, so on resumption
+    ///      they agree with each other while both disagree with the world.
     uint256 private constant POST_HALT_DISTRUST_SECONDS = 180;
 
     mapping(PoolId poolId => PoolState) private _poolState;
 
     /// @notice Deploys the hook against a PoolManager with validated parameters.
-    /// @dev The address this deploys to must carry exactly the permission bits returned by
-    ///      `getHookPermissions`; `BaseHook` enforces that in its constructor, so deployment
+    /// @dev The address must carry the bits `getHookPermissions` returns, so deployment
     ///      requires a mined CREATE2 salt.
     constructor(IPoolManager poolManager, AssayConfig memory config) BaseHook(poolManager) {
         AssayConfigLib.validate(config);
@@ -79,11 +72,8 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     }
 
     /// @notice The permissions this hook requires, and no others.
-    /// @dev `afterSwapReturnDelta` carries the toxicity surcharge: `_donateCeilingOverflow`
-    ///      returns a positive delta that repays the `donate` it just made. This is the only
-    ///      path where the hook touches swapper funds and is the first thing to review.
-    ///      Permission bits are encoded in the hook address, so a bit cannot be added later
-    ///      without changing the address and invalidating every recorded deployment.
+    /// @dev `afterSwapReturnDelta` carries the surcharge -- the only path touching swapper
+    ///      funds. No liquidity permissions, so an LP can always withdraw.
     function getHookPermissions() public pure override returns (Hooks.Permissions memory permissions) {
         return Hooks.Permissions({
             beforeInitialize: true,
@@ -104,15 +94,13 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     }
 
     /// @notice The fee bounds this hook was deployed with, in hundredths of a bip.
-    /// @dev See `surchargeBounds` for the separate ceiling on the donate surcharge; this
-    ///      covers only the percentage fee.
+    /// @dev Covers only the percentage fee; see `surchargeBounds` for the donate surcharge.
     function feeBounds() external view returns (uint24 baseFeePips, uint24 minFeePips, uint24 maxFeePips) {
         return (BASE_FEE_PIPS, MIN_FEE_PIPS, MAX_FEE_PIPS);
     }
 
     /// @notice The most this hook can take from a swap beyond the quoted LP fee.
-    /// @dev An integrator sizing slippage from `feeBounds` alone is not sizing against the
-    ///      worst case, because the donate surcharge is bounded separately from it.
+    /// @dev An integrator sizing slippage from `feeBounds` alone misses this.
     /// @return maxSurchargePips Ceiling on the surcharge, as a share of notional.
     function surchargeBounds() external view returns (uint24 maxSurchargePips, uint24 maxTotalPips) {
         return (FeeBlend.MAX_OVERFLOW_PIPS, MAX_FEE_PIPS + FeeBlend.MAX_OVERFLOW_PIPS);
@@ -124,8 +112,7 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     }
 
     /// @notice How far a pool sits from its reference price, signed for a given direction.
-    /// @dev A caller must check `fresh` before acting: a stale reference means the hook has
-    ///      no view of the drift, not that the drift is zero.
+    /// @dev Check `fresh` first: stale means no view of the drift, not that it is zero.
     /// @return capturedTicks Positive when such a swap would trade toward the reference.
     function signedMispricing(PoolId poolId, bool zeroForOne)
         external
@@ -137,8 +124,7 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
     }
 
     /// @notice The pool's smoothed tick anchor and how far the cached reference sits from it.
-    /// @dev Exposes the deviation-cap inputs so an operator can see why a reference was
-    ///      rejected, not only that it was.
+    /// @dev Exposes the deviation-cap inputs, so an operator can see *why* one was rejected.
     function referenceDeviation(PoolId poolId)
         external
         view
@@ -151,8 +137,7 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
             PoolTwap.withinBound(state.twapTickX32, state.referenceTick, MAX_REFERENCE_DEVIATION_TICKS);
     }
 
-    /// @dev The fee a given state and direction imply. Kept in one place so the quote the
-    ///      hook returns and the quote it reports in `SwapAssayed` cannot drift apart.
+    /// @dev In one place so the returned quote and the one in `SwapAssayed` cannot diverge.
     function _quote(PoolState memory state, bool zeroForOne) private view returns (uint24) {
         return FeeBlend.quote(
             Mispricing.signedTicks(state.referenceTick, state.lastTick, zeroForOne),
@@ -164,13 +149,8 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         );
     }
 
-    /// @dev The oracle interface forbids reverting, but this hook cannot depend on a third
-    ///      party honouring that, so failure is guarded here too.
-    ///
-    ///      `responded` separates "answered, and the answer is unusable" from "the call
-    ///      failed". The first settles the question for this block; the second must not be
-    ///      allowed to stand in for it, or a caller metering their own gas could retire the
-    ///      block's refresh without ever letting the oracle speak.
+    /// @dev `responded` separates "answered unusably" from "the call failed": only the first
+    ///      settles the block, or a caller metering gas could retire the refresh silently.
     function _readReference() private view returns (int24 referenceTick, bool fresh, bool responded) {
         try REFERENCE_ORACLE.referenceSqrtPriceX96{gas: ORACLE_READ_GAS_LIMIT}() returns (
             uint160 sqrtPriceX96, bool ok
@@ -184,12 +164,9 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         }
     }
 
-    /// @dev Rejects pools this hook cannot price. v4 hooks are permissionless, so anyone may
-    ///      create a pool naming this one, and the reference describes exactly one pair --
-    ///      a pool of different assets would be quoted against a price for something else
-    ///      and reported fresh while doing it. This is the only place the hook refuses
-    ///      anything: it runs before any liquidity exists, so a revert here cannot brick a
-    ///      pool the way one on the swap path would.
+    /// @dev v4 hooks are permissionless, so a pool of different assets would otherwise be
+    ///      quoted against a price for something else and reported fresh. Safe to revert in:
+    ///      it runs before any liquidity exists.
     function _beforeInitialize(address, PoolKey calldata key, uint160)
         internal
         view
@@ -214,15 +191,8 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         return this.beforeInitialize.selector;
     }
 
-    /// @dev Seeds the pool's fee and the state the first swap will measure against.
-    ///
-    ///      The TWAP anchor is seeded from the same tick as `referenceTick`: a fresh oracle
-    ///      reading if one is available, since that is the best information about the true
-    ///      price that exists before any organic trading has happened on this pool, and the
-    ///      pool's own initial tick otherwise. Seeding it from zero, or from the pool's
-    ///      initial tick regardless of the oracle, would risk the deviation cap tripping on
-    ///      the very first block against a reference that was correct all along -- there is
-    ///      no trading history yet to have earned distrust of it.
+    /// @dev The TWAP anchor takes the same tick as `referenceTick`. Seeding from zero would
+    ///      trip the deviation cap in the first block against a correct reference.
     function _afterInitialize(address, PoolKey calldata key, uint160, int24 tick)
         internal
         override
@@ -247,22 +217,10 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         return this.afterInitialize.selector;
     }
 
-    /// @dev Refreshes the pool's view of the reference, then quotes this swap against it.
-    ///
-    ///      The refresh has to happen here, not in `afterSwap`. A reference adopted after the
-    ///      quote is a reference the quote could not see, so the swap that reacts first to an
-    ///      oracle move -- the one actually capturing the dislocation -- would be priced
-    ///      against the stale tick it is about to trade away from, and quoted at or below the
-    ///      base fee for it. Every swap arriving later would then be charged for a gap the
-    ///      first one had already taken. That inverts the mechanism: it discounts informed
-    ///      flow and taxes the flow that follows it.
-    ///
-    ///      The oracle read is still gated to once per block, so this costs no more in total
-    ///      than refreshing in `afterSwap` did; it is the same read, moved to the side of the
-    ///      swap that needs its answer.
-    ///
-    ///      Returns no delta: Assay never takes custody of swap principal, which is the
-    ///      highest-severity finding class in v4 hook audits.
+    /// @dev The refresh must happen here, not in `afterSwap`: a reference adopted after the
+    ///      quote is one the quote could not see, so the swap capturing a dislocation would be
+    ///      priced against the stale tick it is about to trade away from. Returns no delta --
+    ///      the hook never takes custody of swap principal.
     function _beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata)
         internal
         override
@@ -280,10 +238,7 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         );
     }
 
-    /// @dev Folds this swap into the pool's microstructure state.
-    ///
-    ///      The reference is refreshed at most once per block; everything else here advances
-    ///      on every swap.
+    /// @dev Folds this swap into the pool's state. Everything here advances on every swap.
     function _afterSwap(
         address sender,
         PoolKey calldata key,
@@ -294,10 +249,8 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         PoolId poolId = key.toId();
         PoolState memory state = _poolState[poolId];
 
-        // The exact drift `beforeSwap` quoted against. `beforeSwap` already advanced the
-        // reference and wrote it back, and `state.lastTick` is not touched until the bottom
-        // of this function, so reading both here reproduces that quote exactly rather than
-        // re-deriving it from a state that has moved underneath.
+        // The exact drift `beforeSwap` quoted against: it wrote the reference back, and
+        // `lastTick` is untouched until below.
         int256 quotedDrift = Mispricing.signedTicks(state.referenceTick, state.lastTick, params.zeroForOne);
         bool quotedFresh = state.referenceFresh;
 
@@ -318,44 +271,29 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         );
     }
 
-    /// @dev Records where this swap left the pool. Runs on every swap, in `afterSwap`.
-    ///
-    ///      `state` is a memory reference, so the assignment is visible to the caller.
+    /// @dev `state` is a memory reference, so the assignment is visible to the caller.
     function _recordTickInPlace(PoolId poolId, PoolState memory state) private view {
-        // slot0 also carries the price and both fee fields; only the tick is needed here and
-        // the rest are deliberately discarded.
         // slither-disable-next-line unused-return
         (, int24 tickNow,,) = poolManager.getSlot0(poolId);
         state.lastTick = tickNow;
     }
 
-    /// @dev Refreshes the pool's reference and TWAP anchor, MUTATING `state` in place.
-    ///
-    ///      Runs in `beforeSwap`, so the quote that follows sees the reading. `state` is a
-    ///      memory reference, so every assignment below is visible to the caller.
-    ///
-    ///      Kept in its own frame so its locals do not compete for stack slots with the
-    ///      attribution and surcharge work in `afterSwap`.
+    /// @dev MUTATES `state` in place so the quote that follows sees it. Its own frame, so
+    ///      locals do not compete for stack slots.
     function _advanceReferenceInPlace(PoolId poolId, PoolState memory state) private {
-        // Gated on its own tracker, separate from the oracle refresh below, so it fires once
-        // per block whether or not the oracle ever answers. It must not retry: `state.lastTick`
-        // holds the previous block's close only on the first pass; after that it is this
-        // block's own tick. Sharing one tracker with the oracle retry below let a manipulated
-        // same-block tick walk the very anchor the deviation cap relies on.
+        // Its own tracker, so it fires once per block and never retries: `lastTick` holds the
+        // previous block's close only on the first pass. Sharing the oracle's let a
+        // manipulated same-block tick walk this anchor.
         if (state.lastSampleBlock != uint32(block.number)) {
             state.lastSampleBlock = uint32(block.number);
             state.twapTickX32 = PoolTwap.update(state.twapTickX32, state.lastTick, TWAP_LAMBDA_X32);
         }
 
-        // The reference is refreshed at most once per block rather than on every swap. A
-        // live Chainlink read measures ~20,000 gas against the Base Sepolia aggregator, so
-        // the cost is amortised across a block's swaps -- but the first swap of each block
-        // still pays it in full, and that is the hook's most expensive path.
+        // Once per block, not per swap: a live Chainlink read is ~20,000 gas, so the first
+        // swap of each block pays it in full and is the hook's most expensive path.
         if (state.lastBlock != uint32(block.number)) {
-            // Wall clock and block count should advance together. Many seconds across very
-            // few blocks means the chain stopped producing, not that the pool was quiet -- an
-            // untraded hour still advances ~1,800 Base blocks, so its ratio is ordinary.
-            // Subtraction is in uint32 so it survives the type's own epoch rollover.
+            // Many seconds across few blocks means the chain stopped, not that the pool was
+            // quiet -- an untraded hour still advances ~1,800 Base blocks.
             uint32 nowTruncated = uint32(block.timestamp);
             uint256 secondsElapsed = uint256(nowTruncated - state.lastRefreshAt);
             uint256 blocksElapsed = uint256(uint32(block.number) - state.lastBlock);
@@ -363,9 +301,7 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
                 state.lastRefreshAt != 0
                     && secondsElapsed > blocksElapsed * MAX_SECONDS_PER_BLOCK + HALT_GRACE_SECONDS
             ) {
-                // A compile-time constant of 180, far inside uint32; the addition is meant
-                // to wrap with `nowTruncated` at the type's epoch, which is how every other
-                // timestamp comparison in this function stays correct across it.
+                // Meant to wrap with `nowTruncated`, which is how comparisons survive the epoch.
                 // forge-lint: disable-next-line(unsafe-typecast)
                 state.referenceDistrustedUntil = nowTruncated + uint32(POST_HALT_DISTRUST_SECONDS);
                 emit ChainHaltDetected(poolId, secondsElapsed, blocksElapsed, state.referenceDistrustedUntil);
@@ -373,25 +309,19 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
 
             (int24 referenceTick, bool referenceFresh, bool responded) = _readReference();
 
-            // Retired only once the oracle has answered. A call that failed outright leaves
-            // the refresh owed, so the next swap retries on its own gas -- otherwise one
-            // cheap dust swap per block could pin the pool at the ceiling fee while the feed
-            // was healthy throughout.
+            // Retired only once the oracle answered, so a failed call leaves the refresh owed.
+            // Otherwise one dust swap per block could pin the pool at the ceiling.
             if (responded) {
                 state.lastBlock = uint32(block.number);
                 state.lastRefreshAt = nowTruncated;
             }
 
-            // Inside the post-halt window nothing the feed says is trusted, however fresh it
-            // claims to be, because the reading may predate the halt.
+            // Inside the post-halt window the reading may predate the halt.
             if (referenceFresh && nowTruncated < state.referenceDistrustedUntil) {
                 referenceFresh = false;
             }
 
-            // A reading the oracle reports as fresh can still be rejected here for
-            // disagreeing with where the pool has actually traded by more than the cap. This
-            // is the only defence against a compromised feed: an error large enough to matter
-            // shows up as a sustained gap against the pool's own cost-to-manipulate history.
+            // The only defence against a compromised feed.
             if (
                 referenceFresh
                     && !PoolTwap.withinBound(state.twapTickX32, referenceTick, MAX_REFERENCE_DEVIATION_TICKS)
@@ -412,20 +342,10 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         }
     }
 
-    /// @dev Recovers the fee-cap overflow as a real token amount and routes it to in-range
-    ///      liquidity providers via `donate`, funded entirely by the swapper.
-    ///
-    ///      The mechanics: `donate` immediately debits this contract's own balance in the
-    ///      PoolManager's transient ledger. Returning the same amount as a positive
-    ///      `int128` here credits it straight back -- v4 applies that credit to this
-    ///      contract's address in the same ledger before the swapper's own delta is
-    ///      finalised. The two cancel exactly, so the hook is never left holding a balance
-    ///      and never needs `take`; the swapper's settlement absorbs the entire amount,
-    ///      which is what actually funds the donation.
-    ///
-    ///      Zero on the overwhelming majority of swaps: `FeeBlend.ceilingOverflowPips` is
-    ///      zero unless the uncapped formula would have asked for more than `maxFeePips`
-    ///      already covers, which only happens on an extreme dislocation.
+    /// @dev `donate` debits this contract in the transient ledger; returning the same amount
+    ///      as a positive `int128` credits it back. The two cancel exactly, so the hook never
+    ///      holds a balance -- the swapper's settlement is what funds the donation. Zero on
+    ///      nearly every swap; only an extreme dislocation reaches the ceiling.
     function _donateCeilingOverflow(
         PoolId poolId,
         PoolKey calldata key,
@@ -437,41 +357,26 @@ contract AssayHook is BaseHook, IAssayErrors, IAssayEvents {
         uint24 overflowPips = FeeBlend.ceilingOverflowPips(
             quotedDrift, quotedFresh, BASE_FEE_PIPS, MAX_FEE_PIPS, CAPTURE_SHARE_BPS
         );
-        // Exact comparison on an exactly-computed integer, not on a balance or a price.
-        // Zero here means the uncapped formula never reached the ceiling, which is the
-        // common case and must short-circuit before any external call.
+        // The common case, short-circuiting before any external call.
         // slither-disable-next-line incorrect-equality
         if (overflowPips == 0) return 0;
 
-        // `donate` reverts outright when the pool has no in-range liquidity, because there
-        // is nobody to credit the fee growth to. A swap that walks the price out of every
-        // liquidity range would otherwise revert here, in `afterSwap`, bricking the pool for
-        // the exact reason this hook is built never to do. Skipping the surcharge is the
-        // only safe response: there are no liquidity providers in range to receive it.
+        // `donate` reverts with no in-range liquidity, and reverting in `afterSwap` would
+        // brick the pool. Skipping the surcharge is the only safe response.
         if (poolManager.getLiquidity(poolId) == 0) return 0;
 
         (bool currency0IsUnspecified, uint256 notional) = ToxicitySurcharge.unspecifiedAmount(params, delta);
 
-        // `notional` is the magnitude of an int128 delta and `overflowPips` is bounded by
-        // FeeBlend.MAX_OVERFLOW_PIPS, which equals the pips denominator, so the surcharge is
-        // at most `notional` and therefore always fits int128. No range check is needed here
-        // and adding one would be an unreachable branch.
+        // `notional` is an int128 magnitude and `overflowPips` is bounded, so this fits.
         uint256 amount = ToxicitySurcharge.surchargeAmount(notional, overflowPips);
-        // As above: an exact integer. `surchargeAmount` rounds up, so this is zero only when
-        // the swap's unspecified side is itself zero -- a swap whose output rounded away
-        // entirely. Donating zero would cost an external call and emit a meaningless event.
+        // Rounds up, so zero means the unspecified side was itself zero.
         // slither-disable-next-line incorrect-equality
         if (amount == 0) return 0;
 
         emit ToxicitySurchargeDonated(poolId, amount, currency0IsUnspecified);
 
-        // Emitted before the call rather than after. If `donate` reverts the whole
-        // transaction reverts and the event never persists, so the ordering is equivalent
-        // and the log cannot be observed mid-call by a reentrant party.
-        //
-        // The returned BalanceDelta is discarded deliberately: it is exactly `-amount` on
-        // the donated side, which is already known here and is what the returned hook delta
-        // credits straight back.
+        // Emitted before the call: if `donate` reverts so does the transaction. The returned
+        // delta is discarded -- it is `-amount`, already known here.
         if (currency0IsUnspecified) {
             // slither-disable-next-line unused-return
             poolManager.donate(key, amount, 0, "");

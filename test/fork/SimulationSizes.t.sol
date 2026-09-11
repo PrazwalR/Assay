@@ -57,10 +57,10 @@ contract SimulationSizesForkTest is Test {
         uint256 wethBefore = IERC20Like(WETH).balanceOf(trader);
         swapRouter.swap(
             poolKey,
-            // `usdcIn` is a small literal from the test table, far inside int256.
-            // forge-lint: disable-next-line(unsafe-typecast)
             SwapParams({
                 zeroForOne: true,
+                // `usdcIn` is a small literal from the test table, far inside int256.
+                // forge-lint: disable-next-line(unsafe-typecast)
                 amountSpecified: -int256(usdcIn),
                 sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
             }),
@@ -72,10 +72,10 @@ contract SimulationSizesForkTest is Test {
         uint256 usdcBefore = IERC20Like(USDC).balanceOf(trader);
         swapRouter.swap(
             poolKey,
-            // `wethOut` is the measured output of the leg above, far inside int256.
-            // forge-lint: disable-next-line(unsafe-typecast)
             SwapParams({
                 zeroForOne: false,
+                // `wethOut` is the measured output of the leg above, far inside int256.
+                // forge-lint: disable-next-line(unsafe-typecast)
                 amountSpecified: -int256(wethOut),
                 sqrtPriceLimitX96: TickMath.MAX_SQRT_PRICE - 1
             }),

@@ -4,50 +4,28 @@ pragma solidity 0.8.26;
 import {Mispricing} from "./Mispricing.sol";
 
 /// @notice Turns a swap's signed mispricing into the fee it should be quoted.
-/// @dev The no-arbitrage band, not a fitted model. An arbitrageur profits only when the
-///      drift they capture exceeds what they pay for it, so a fee set as a share of that
-///      drift takes back part of the extraction while leaving the trade worth doing -- a fee
-///      large enough to deter arbitrage entirely leaves the pool stale, which drives away the
-///      uninformed flow that is the LP's only revenue.
-///
-///      Flow trading *away* from the reference captures nothing, so its mispricing is
-///      negative and it is quoted below base. That is the entire per-swap discrimination:
-///      two swaps in one block, same drift, opposite directions, quoted differently.
+/// @dev A no-arbitrage band, not a fitted model. A *share* of the captured drift leaves the
+///      trade worth doing; deterring arbitrage entirely leaves the pool stale, which drives
+///      away the uninformed flow that is the LP's only revenue.
 library FeeBlend {
-    /// @dev Bound applied to the drift before it is scaled. `Mispricing` already clamps to
-    ///      this, but the parameter is a plain int256 and this function runs on the swap
-    ///      path, so the bound is enforced here too rather than assumed of the caller.
-    ///      Without it the scaling below overflows near the extremes of the type. Taken from
-    ///      `Mispricing` rather than restated: two matching literals in two files is not a
-    ///      guarantee that they match.
+    /// @dev Re-clamped rather than assumed of the caller, or the scaling below overflows.
+    ///      Imported from `Mispricing`: two matching literals are not a guarantee.
     int256 internal constant MAX_DRIFT_TICKS = Mispricing.MAX_MISPRICING_TICKS;
 
-    /// @dev One tick is one basis point of price, and fees are quoted in hundredths of a
-    ///      basis point, so a tick of drift is worth 100 pips of fee.
+    /// @dev One tick is one basis point, and fees are in hundredths of one.
     int256 internal constant PIPS_PER_TICK = 100;
 
     /// @dev Denominator for `captureShareBps`.
     int256 internal constant BPS_DENOMINATOR = 10_000;
 
-    /// @dev Ceiling on the value `ceilingOverflowPips` can report, independent of
-    ///      `maxFeePips`. Bounding it here, rather than trusting the caller to bound what it
-    ///      does with the result, keeps a later token-amount multiplication provably safe
-    ///      regardless of how extreme the input drift is -- the same defence this codebase
-    ///      has needed in three other libraries already.
-    /// @dev One hundred percent, in the hundredths-of-a-bip unit every fee here is
-    ///      expressed in. This is the scale the surcharge percentage is measured against,
-    ///      not a bound on it -- `MAX_OVERFLOW_PIPS` below is the bound.
+    /// @dev 100% in pips: the scale the surcharge is measured against, not a bound on it.
     uint24 internal constant PIPS_DENOMINATOR = 1_000_000;
 
-    /// @dev Ceiling on the toxicity surcharge, as a share of notional. Previously this was
-    ///      `PIPS_DENOMINATOR` itself -- a 100%-of-notional bound in name only, which no
-    ///      integrator could price against. At 2% it still covers every dislocation up to
-    ///      ~35% of price movement, while capping what an attacker who manufactures drift
-    ///      can extract from the swap that follows theirs.
+    /// @dev Ceiling on the surcharge, as a share of notional. 2% covers dislocations to ~35%
+    ///      of price movement while bounding what manufactured drift can extract.
     uint24 internal constant MAX_OVERFLOW_PIPS = 20_000;
 
-    /// @dev The share-of-drift computation shared by `quote` and `ceilingOverflowPips`, kept
-    ///      in one place so the two can never compute the surcharge differently.
+    /// @dev Shared by `quote` and `ceilingOverflowPips` so the two cannot diverge.
     function _rawQuotedPips(int256 signedMispricingTicks, uint24 baseFeePips, uint24 captureShareBps)
         private
         pure
@@ -62,11 +40,8 @@ library FeeBlend {
 
         int256 scaled = drift * PIPS_PER_TICK * int256(uint256(captureShareBps));
 
-        // Rounded toward positive infinity so the quoted fee is never below the exact value.
-        // Solidity's signed division truncates toward zero, which lowers the fee on the
-        // capturing side -- the toxic side -- and is therefore the liquidity-adverse
-        // direction. Truncation toward zero already rounds a negative surcharge upward, so
-        // only the positive case needs correcting.
+        // Toward +inf, so the fee is never below the exact value: Solidity truncates toward
+        // zero, lowering it on the capturing side. Negatives already round up.
         int256 surcharge = scaled / BPS_DENOMINATOR;
         if (scaled > 0 && scaled % BPS_DENOMINATOR != 0) {
             surcharge += 1;
@@ -76,8 +51,8 @@ library FeeBlend {
     }
 
     /// @notice The fee to quote for a swap.
-    /// @dev Total over its whole input domain. This runs inside `beforeSwap`, where a revert
-    ///      would make the pool untradeable for everyone, so every path returns a value.
+    /// @dev Total over its input domain: a revert in `beforeSwap` would make the pool
+    ///      untradeable for every LP, so every path returns a value.
     /// @return feePips The quoted fee, always within [minFeePips, maxFeePips].
     function quote(
         int256 signedMispricingTicks,
@@ -87,10 +62,8 @@ library FeeBlend {
         uint24 maxFeePips,
         uint24 captureShareBps
     ) internal pure returns (uint24 feePips) {
-        // Without a trustworthy reference the hook cannot tell which flow it is facing, so
-        // it charges the ceiling. Degrading upward is the conservative direction: it errs
-        // toward protecting liquidity providers rather than toward underpricing whatever
-        // arrived while the reference was dark. It never reverts.
+        // No trustworthy reference means no way to tell which flow this is, so it charges
+        // the ceiling. Degrading *upward* protects LPs.
         if (!referenceFresh) return maxFeePips;
 
         int256 quoted = _rawQuotedPips(signedMispricingTicks, baseFeePips, captureShareBps);
@@ -104,22 +77,9 @@ library FeeBlend {
     }
 
     /// @notice How far the *uncapped* formula wants to charge beyond `maxFeePips`.
-    /// @dev `quote` expresses the surcharge as a percentage of the swap's own notional, and
-    ///      that percentage is capped at `maxFeePips` for reasons unrelated to how toxic any
-    ///      given swap is -- an LP fee above a few percent is not a sane pool parameter
-    ///      regardless of what the mispricing formula would ask for. On an ordinary swap the
-    ///      cap is never reached and this returns zero. On an extreme dislocation (a rare
-    ///      tail event, not the common case) the formula wants to charge more than a
-    ///      percentage-of-notional fee can express, and everything past the cap is silently
-    ///      discarded by `quote` alone.
-    ///
-    ///      This is that discarded remainder, in the same pips units, so a caller can recover
-    ///      it as an absolute amount and route it to liquidity providers directly rather than
-    ///      losing it to the cap. It is zero whenever the reference is stale: with no trusted
-    ///      drift reading there is nothing to attribute an overflow to, and `quote` is already
-    ///      charging the ceiling through the ordinary path in that case.
-    /// @return overflowPips The amount by which the uncapped formula exceeds `maxFeePips`,
-    ///         zero if it does not, bounded by `MAX_OVERFLOW_PIPS` regardless of input.
+    /// @dev `quote` discards everything past its cap; this is that remainder, recoverable as
+    ///      a token amount. Zero on an ordinary swap and on a stale reference.
+    /// @return overflowPips Excess over `maxFeePips`, bounded by `MAX_OVERFLOW_PIPS`.
     function ceilingOverflowPips(
         int256 signedMispricingTicks,
         bool referenceFresh,
@@ -138,7 +98,7 @@ library FeeBlend {
             overflow = int256(uint256(MAX_OVERFLOW_PIPS));
         }
 
-        // overflow is now in [1, MAX_OVERFLOW_PIPS], which fits uint24 (max 16,777,215).
+        // Now in [1, MAX_OVERFLOW_PIPS], which fits uint24.
         // forge-lint: disable-next-line(unsafe-typecast)
         return uint24(uint256(overflow));
     }

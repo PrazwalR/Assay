@@ -14,22 +14,17 @@ import {AssayConfig} from "../src/config/AssayConfig.sol";
 
 /// @notice Mines a compliant hook address and deploys AssayHook against the PoolManager for
 ///         the current chain.
-/// @dev Every parameter is read from the environment and validated before use. The
-///      PoolManager address is resolved from the chain id via hookmate rather than passed in,
-///      so a deploy pointed at the wrong network fails instead of deploying against a
-///      contract that happens to exist at a hardcoded address.
+/// @dev The PoolManager is resolved from the chain id, so a deploy pointed at the wrong
+///      network fails rather than deploying against whatever sits at a hardcoded address.
 contract DeployAssay is Script {
-    /// @dev Foundry routes salted deployments through this proxy when broadcasting, so the
-    ///      mined address must be computed against it and not against the script address.
+    /// @dev Foundry routes salted deployments through this, so the mined address must be
+    ///      computed against it, not the script.
     address internal constant CREATE2_DEPLOYER = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     /// @notice Reads configuration from the environment and deploys to the current chain.
     /// @return hook The deployed hook.
-    /// @dev Reads an environment variable that must fit `uint24`, and refuses it if it does
-    ///      not. A bare `uint24(vm.envUint(...))` truncates silently: `16780216` becomes
-    ///      `3000`, and the wrong value is then baked into an immutable at a mined CREATE2
-    ///      address that cannot be redeployed to. Every other layer of this project rejects
-    ///      out-of-range input; the deploy path is the one place it would be irreversible.
+    /// @dev A bare `uint24(vm.envUint(...))` truncates silently, and the wrong value is then
+    ///      immutable at a mined address that cannot be redeployed to.
     function _envUint24(string memory name) private view returns (uint24) {
         uint256 raw = vm.envUint(name);
         require(raw <= type(uint24).max, string.concat(name, " exceeds uint24"));
@@ -61,8 +56,7 @@ contract DeployAssay is Script {
     }
 
     /// @notice Mines a compliant salt and deploys the hook.
-    /// @dev Split from `run` so the mining and deployment path is exercised by tests without
-    ///      mutating the process environment.
+    /// @dev Split from `run` so tests exercise it without mutating the environment.
     /// @param poolManager The PoolManager the hook will serve.
     /// @param config Validated fee bounds, checked again inside the constructor.
     /// @return hook The deployed hook, asserted to sit at the mined address.

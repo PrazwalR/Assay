@@ -31,20 +31,12 @@ interface IERC20Minimal {
 
 /// @notice Adds depth to the already-initialised pool and trades it, so the hook has priced
 ///         more than the two swaps its deploy script produced.
-/// @dev Distinct from `SetupPool.s.sol`, which creates the pool. This one attaches to the
-///      existing one and to the routers already deployed alongside it, read from the
-///      environment rather than redeployed -- a second pair of routers would fragment the
-///      approvals and leave the frontend pointing at the wrong one.
+/// @dev Attaches to the pool `SetupPool` created and to the routers deployed alongside it,
+///      read from the environment -- a second pair would fragment the approvals.
 ///
-///      Two properties this script is careful about:
-///
-///      1. **Liquidity is sized from the balance actually held**, less a reserve kept back to
-///         fund the swaps. Committing every token to the position leaves nothing to trade with
-///         and the swap loop reverts after the liquidity is already in.
-///      2. **Swaps alternate direction.** Each one returns the token the next one spends, so a
-///         sequence costs only fees rather than requiring fresh capital per swap -- and the
-///         alternation keeps the tick near where it started instead of walking the position
-///         out of range.
+///      Liquidity is sized from the balance held, less a reserve to fund the swaps.
+///      Swaps alternate direction, so each returns the token the next spends and the tick
+///      stays near where it started rather than walking the position out of range.
 contract SeedActivity is Script {
     using StateLibrary for IPoolManager;
     using LPFeeLibrary for uint24;
@@ -71,8 +63,7 @@ contract SeedActivity is Script {
             PoolModifyLiquidityTest(vm.envAddress("ASSAY_LIQUIDITY_ROUTER"));
         PoolSwapTest swapRouter = PoolSwapTest(vm.envAddress("ASSAY_SWAP_ROUTER"));
 
-        // How much currency0 to commit to the position, and how much to hold back for the
-        // swap loop. Read from the environment so a rerun with different depth needs no edit.
+        // Read from the environment so a rerun with different depth needs no edit.
         uint256 addAmount0 = vm.envUint("ASSAY_TOPUP_AMOUNT0");
         uint256 wrapAmount1 = vm.envUint("ASSAY_TOPUP_WRAP1");
         uint256 swapAmount0 = vm.envUint("ASSAY_SWAP_AMOUNT0");
@@ -90,11 +81,8 @@ contract SeedActivity is Script {
         _prepareFunds(currency0, currency1, wrapAmount1, address(liquidityRouter), address(swapRouter));
         _addLiquidity(liquidityRouter, key, sqrtPriceBefore, tickBefore, addAmount0);
 
-        // Seven swaps, alternating. The first is currency0-in, which is the direction that
-        // trades toward a reference sitting below the pool -- the priced side.
-        //
-        // Each amount is env-sourced (ASSAY_SWAP_AMOUNT0/1, set by the operator), far inside
-        // int256 -- the same shape of cast the fork test suppresses the same way.
+        // Seven alternating swaps, starting currency0-in: the side that trades toward a
+        // reference below the pool. Amounts are env-sourced and far inside int256.
         // forge-lint: disable-next-line(unsafe-typecast)
         _swap(swapRouter, key, true, int256(swapAmount0));
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -115,9 +103,8 @@ contract SeedActivity is Script {
         _report(poolManager, poolId, liquidityBefore);
     }
 
-    /// @dev Wraps the shortfall and re-approves both routers. Approvals are already at max
-    ///      from `SetupPool`, but asserting them here costs one cheap call and makes this
-    ///      script runnable against a wallet that has not run that one.
+    /// @dev Re-approves both routers even though `SetupPool` set them to max, so this runs
+    ///      against a wallet that never ran that script.
     function _prepareFunds(
         Currency currency0,
         Currency currency1,
@@ -135,8 +122,7 @@ contract SeedActivity is Script {
         IERC20Minimal(Currency.unwrap(currency1)).approve(swapRouter, type(uint256).max);
     }
 
-    /// @dev Adds to the same tick range the seed position occupies, so the depth concentrates
-    ///      where the pool actually trades rather than fragmenting across two ranges.
+    /// @dev Same tick range as the seed position, so depth concentrates where it trades.
     function _addLiquidity(
         PoolModifyLiquidityTest liquidityRouter,
         PoolKey memory key,
@@ -144,8 +130,8 @@ contract SeedActivity is Script {
         int24 currentTick,
         uint256 amount0
     ) private {
-        // Divide-then-multiply snaps each bound to a tick-spacing boundary, which
-        // `modifyLiquidity` requires. Multiplying first would defeat the expression.
+        // Divide-then-multiply snaps each bound to a tick-spacing boundary, as
+        // `modifyLiquidity` requires. Multiplying first would defeat it.
         // forge-lint: disable-next-line(divide-before-multiply)
         int24 lower = ((currentTick - TICK_SPACING * RANGE_MULTIPLE) / TICK_SPACING) * TICK_SPACING;
         // forge-lint: disable-next-line(divide-before-multiply)

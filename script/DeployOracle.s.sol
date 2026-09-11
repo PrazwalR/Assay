@@ -8,24 +8,18 @@ import {Currency, CurrencyLibrary} from "v4-core/types/Currency.sol";
 
 import {ChainlinkReferenceAdapter, IAggregatorV3} from "../src/oracle/ChainlinkReferenceAdapter.sol";
 
-/// @dev Minimal ERC-20 view for reading a token's decimals off chain. Declared locally,
-///      matching how the adapter itself declares `IAggregatorV3` rather than importing a
-///      full token interface for one field.
+/// @dev Minimal ERC-20 view, declared locally rather than importing a full interface.
 interface IERC20Decimals {
     function decimals() external view returns (uint8);
 }
 
 /// @notice Deploys the reference price source the hook is bound to.
-/// @dev Separate from `DeployAssay` because the hook takes the adapter's address as a
-///      constructor argument, and that address must exist first. Each script does one thing
-///      so a failed hook deploy does not silently redeploy a working oracle.
+/// @dev Separate from `DeployAssay` because the hook takes this address as a constructor
+///      argument, so a failed hook deploy cannot silently redeploy a working oracle.
 ///
-///      Every parameter comes from the environment except the price-scaling numerator, which
-///      this script derives from the feed's and both tokens' own `decimals()` rather than
-///      accepting one as an argument. A hand-typed numerator that assumed the wrong decimals
-///      used to deploy without complaint and price every swap against a reference that was
-///      not the price of anything (see `ChainlinkReferenceAdapter`'s constructor, which
-///      re-derives and checks the same value independently of this script).
+///      The price-scaling numerator is derived from the feed's and both tokens' own
+///      `decimals()`, never accepted as an argument: a hand-typed one assuming the wrong
+///      decimals used to deploy without complaint and price against nothing real.
 contract DeployOracle is Script {
     /// @notice Reads configuration from the environment and deploys to the current chain.
     /// @return adapter The deployed adapter.
@@ -39,12 +33,7 @@ contract DeployOracle is Script {
     }
 
     /// @notice Derives the decimal scaling and deploys the adapter.
-    /// @dev Split from `run` so the derivation is exercised by tests without mutating the
-    ///      process environment, matching the `run`/`deploy` split in `DeployAssay`.
-    /// @param feed The Chainlink aggregator to read.
-    /// @param maxAge Staleness bound in seconds.
-    /// @param currency0 Lower-sorted currency of the pair this adapter prices.
-    /// @param currency1 Higher-sorted currency of that pair.
+    /// @dev Split from `run` so tests exercise it without mutating the environment.
     /// @return adapter The deployed adapter, already confirmed to produce a fresh reading.
     function deploy(IAggregatorV3 feed, uint256 maxAge, Currency currency0, Currency currency1)
         public
@@ -59,8 +48,7 @@ contract DeployOracle is Script {
             feed, maxAge, numerator, currency0, decimals0, currency1, decimals1
         );
 
-        // Read it back before reporting success. A deployed adapter that cannot produce a
-        // usable price is worse than a failed deploy, because the failure surfaces later.
+        // A deployed adapter that cannot price is worse than a failed deploy: it surfaces later.
         (uint160 sqrtPriceX96, bool fresh) = adapter.referenceSqrtPriceX96();
         require(fresh, "DeployOracle: feed did not return a usable price");
 
@@ -76,8 +64,7 @@ contract DeployOracle is Script {
         console2.log("Set ASSAY_REFERENCE_ORACLE to the adapter address above, then run DeployAssay.");
     }
 
-    /// @dev Native ETH carries no ERC-20 contract to query and is conventionally 18 decimals
-    ///      wherever v4 represents it as the zero currency.
+    /// @dev Native ETH has no contract to query and is 18 decimals by convention.
     function _decimalsOf(Currency currency) private view returns (uint8) {
         if (CurrencyLibrary.isAddressZero(currency)) return 18;
         return IERC20Decimals(Currency.unwrap(currency)).decimals();

@@ -34,28 +34,14 @@ interface IERC20Minimal {
 }
 
 /// @notice Creates the first real pool against a deployed AssayHook, seeds it, and trades it.
-/// @dev Until this runs there is no pool anywhere that names the hook, so the hook has never
-///      priced a real swap and has emitted no events. Everything downstream of that — the
-///      Markets surface, the event log, any indexer — has nothing to read.
-///
-///      Three properties this script is careful about:
-///
-///      1. **The pool is initialised at the oracle's own price.** Reading
-///         `referenceSqrtPriceX96()` and initialising there means drift starts at zero, so the
-///         first swaps are priced at the base fee rather than against an invented dislocation.
-///      2. **Liquidity is computed from the balances actually held**, not from a guessed
-///         `liquidityDelta`. Picking a delta and hoping the balance covers it is how this
-///         reverts after the pool is already created.
-///      3. **Swaps go both ways.** One direction captures drift and the other does not, and
-///         that asymmetry is the entire thing being demonstrated — a single swap would prove
-///         only that the hook does not revert.
+/// @dev Initialised at the oracle's own price so drift starts at zero; liquidity computed
+///      from balances held, not a guessed delta; swaps both ways, since the asymmetry is the
+///      whole point.
 contract SetupPool is Script {
     using StateLibrary for IPoolManager;
     using LPFeeLibrary for uint24;
 
-    /// @dev Wide enough that the small seed position stays in range across the swaps below,
-    ///      narrow enough that the same capital gives usable depth. Must be a multiple of the
-    ///      tick spacing or `modifyLiquidity` reverts.
+    /// @dev Must be a multiple of the tick spacing or `modifyLiquidity` reverts.
     int24 internal constant TICK_SPACING = 60;
     int24 internal constant RANGE_MULTIPLE = 100;
 
@@ -66,8 +52,7 @@ contract SetupPool is Script {
         Currency currency0 = Currency.wrap(vm.envAddress("ASSAY_ORACLE_CURRENCY0"));
         Currency currency1 = Currency.wrap(vm.envAddress("ASSAY_ORACLE_CURRENCY1"));
 
-        // Amounts to commit, in each token's own units. Read from the environment so a rerun
-        // with different depth does not need a code change.
+        // Read from the environment so a rerun with different depth needs no code change.
         uint256 amount0 = vm.envUint("ASSAY_SEED_AMOUNT0");
         uint256 amount1 = vm.envUint("ASSAY_SEED_AMOUNT1");
 
@@ -80,8 +65,7 @@ contract SetupPool is Script {
         });
         PoolId poolId = key.toId();
 
-        // Initialise at the reference, not at a chosen price: the hook's entire signal is the
-        // gap between the two, and seeding a gap would mean the first swap paid a surcharge for
+        // At the reference, not a chosen price: a seeded gap would charge the first swap for
         // a dislocation this script invented.
         (uint160 sqrtPriceX96, bool fresh) = IReferencePriceOracle(
                 address(uint160(vm.envAddress("ASSAY_REFERENCE_ORACLE")))
@@ -96,9 +80,7 @@ contract SetupPool is Script {
 
         vm.startBroadcast();
 
-        // Routers. v4 has no canonical public swap router on this chain, and the core test
-        // routers are the reference implementations of the unlock/settle dance — deploying our
-        // own is more honest than pointing at an address that might not be what it claims.
+        // v4 has no canonical public router on this chain; these are the reference ones.
         PoolModifyLiquidityTest liquidityRouter = new PoolModifyLiquidityTest(poolManager);
         PoolSwapTest swapRouter = new PoolSwapTest(poolManager);
 
@@ -107,11 +89,8 @@ contract SetupPool is Script {
         poolManager.initialize(key, sqrtPriceX96);
         _seed(liquidityRouter, key, sqrtPriceX96, amount0, amount1);
 
-        // Both directions, so the log carries the asymmetry rather than a single data point.
-        // Sized as a small fraction of the position: enough to move the tick and be priced,
-        // not enough to walk out of range and strand the position.
-        // Both seed amounts are deployer-supplied and far below 2**255, so the cast cannot
-        // wrap; a value large enough to matter would have failed at the balance check first.
+        // Both directions, so the log carries the asymmetry. Deployer-supplied and far below
+        // 2**255, so the casts are safe.
         // forge-lint: disable-next-line(unsafe-typecast)
         _swap(swapRouter, key, true, int256(amount0 / 20));
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -122,8 +101,7 @@ contract SetupPool is Script {
         _report(poolManager, poolId, address(liquidityRouter), address(swapRouter));
     }
 
-    /// @dev Final state, in its own frame. Reading slot0 and liquidity alongside two router
-    ///      addresses is four more stack slots than `run` has left.
+    /// @dev Its own frame: four more stack slots than `run` has left.
     function _report(IPoolManager poolManager, PoolId poolId, address liquidityRouter, address swapRouter)
         private
         view
@@ -138,8 +116,7 @@ contract SetupPool is Script {
         console2.log("swap router     ", swapRouter);
     }
 
-    /// @dev Wraps the ETH the position needs and approves both routers. Its own frame so its
-    ///      locals do not compete for stack slots with the liquidity arithmetic.
+    /// @dev Wraps the ETH the position needs and approves both routers. Its own frame.
     function _prepareFunds(
         Currency currency0,
         Currency currency1,
